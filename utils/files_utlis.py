@@ -23,3 +23,9 @@ def default_serializer(obj: Any) -> Any:
         return obj.__dict__
     else:
         return obj
+def make_directory_wrapped(filepath: str, **kwargs) -> None:
+    if isinstance(filepath, Path):
+        parent_dir = filepath.parent
+    else:
+        parent_dir = "/".join(filepath.split("/")[:-1])
+    os.makedirs(parent_dir, exist_ok=True, **kwargs)
