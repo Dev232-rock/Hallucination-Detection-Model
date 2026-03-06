@@ -44,3 +44,36 @@ def pydantic_to_dict(obj) -> dict:
         return {k: pydantic_to_dict(v) for k, v in obj.items()}
     else:
         return obj
+
+def make_directory_wrapped(filepath: str, **kwargs) -> None:
+    if isinstance(filepath, Path):
+        parent_dir = filepath.parent
+    else:
+        parent_dir = "/".join(filepath.split("/")[:-1])
+    os.makedirs(parent_dir, exist_ok=True, **kwargs)
+
+def save_jsonl(
+    dict_list: List[Dict[Any, Any]],
+    filepath: str,
+    append: bool = False,
+    serialize_dataclasses: bool = False,
+    serialize_pydantic: bool = False,
+) -> None:
+#Write a list of dictionaries to a jsonlines file.
+    make_directory_wrapped(filepath)
+
+    if isinstance(dict_list, dict):
+        dict_list = [dict_list]
+
+    if append and (not os.path.exists(filepath)):
+        print(f"File {filepath} does not exist, setting append to False")
+        append = False
+
+    mode = "a" if append else "w"
+    with open(filepath, mode=mode) as file:
+        for item in dict_list:
+            if serialize_dataclasses:
+                item = dataclass_to_dict(item)
+            elif serialize_pydantic:
+                item = pydantic_to_dict(item)
+            file.write(json.dumps(item) + "\n")
