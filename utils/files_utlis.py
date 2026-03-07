@@ -59,7 +59,7 @@ def save_jsonl(
     serialize_dataclasses: bool = False,
     serialize_pydantic: bool = False,
 ) -> None:
-#Write a list of dictionaries to a jsonlines file.
+# Write a list of dictionaries to a jsonlines file.
     make_directory_wrapped(filepath)
 
     if isinstance(dict_list, dict):
