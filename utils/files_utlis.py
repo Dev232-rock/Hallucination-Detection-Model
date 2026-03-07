@@ -77,3 +77,15 @@ def save_jsonl(
             elif serialize_pydantic:
                 item = pydantic_to_dict(item)
             file.write(json.dumps(item) + "\n")
+def load_jsonl(path: Union[str, Path]) -> List[Dict[str, Any]]:
+
+    #Load data from a JSON file
+    path = Path(path)
+    data = []
+    
+    with open(path, 'r', encoding='utf-8') as f:
+        for line in f:
+            line = line.strip()
+            if line:
+                data.append(json.loads(line))
+    return data
