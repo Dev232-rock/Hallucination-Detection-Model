@@ -89,3 +89,18 @@ def load_jsonl(path: Union[str, Path]) -> List[Dict[str, Any]]:
             if line:
                 data.append(json.loads(line))
     return data
+
+def save_json(
+    data: Any, 
+    path: Union[str, Path], 
+    indent: int = 2,
+    serializer: Callable = default_serializer) -> None:
+    # save data to a JSON file.
+    path = Path(path)
+    path.parent.mkdir(parents=True, exist_ok=True)
+    
+    with open(path, 'w', encoding='utf-8') as f:
+        if serializer:
+            json.dump(data, f, ensure_ascii=False, indent=indent, default=serializer)
+        else:
+            json.dump(data, f, ensure_ascii=False, indent=indent)
