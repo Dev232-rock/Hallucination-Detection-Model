@@ -94,8 +94,9 @@ def save_json(
     data: Any, 
     path: Union[str, Path], 
     indent: int = 2,
-    serializer: Callable = default_serializer) -> None:
-    # save data to a JSON file.
+    serializer: Callable = default_serializer
+) -> None:
+    #save data to a JSON file.
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
     
@@ -104,3 +105,10 @@ def save_json(
             json.dump(data, f, ensure_ascii=False, indent=indent, default=serializer)
         else:
             json.dump(data, f, ensure_ascii=False, indent=indent)
+
+
+def load_json(path: Union[str, Path]) -> Any:
+    path = Path(path)
+    
+    with open(path, 'r', encoding='utf-8') as f:
+        return json.load(f)
