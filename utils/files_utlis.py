@@ -94,8 +94,7 @@ def save_json(
     data: Any, 
     path: Union[str, Path], 
     indent: int = 2,
-    serializer: Callable = default_serializer
-) -> None:
+    serializer: Callable = default_serializer ) -> None:
     #save data to a JSON file.
     path = Path(path)
     path.parent.mkdir(parents=True, exist_ok=True)
