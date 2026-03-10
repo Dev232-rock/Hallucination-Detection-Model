@@ -111,3 +111,10 @@ def load_json(path: Union[str, Path]) -> Any:
     
     with open(path, 'r', encoding='utf-8') as f:
         return json.load(f)
+
+def load_yaml(path: Union[str, Path]) -> Dict[str, Any]:
+  #  Load data from a YAML file.
+    path = Path(path)
+    
+    with open(path, 'r', encoding='utf-8') as f:
+        return yaml.safe_load(f)
