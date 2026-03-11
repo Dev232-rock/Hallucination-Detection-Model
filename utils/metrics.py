@@ -11,6 +11,5 @@ def compute_clf_metrics(
     labels: np.ndarray, 
     probs: np.ndarray
 ) -> Dict[str, float]:
-
-# Compute classification metrics.
+    # Compute classification metrics
     assert all((labels == 0.0) | (labels == 1.0)), "labels must be either 0 or 1"
