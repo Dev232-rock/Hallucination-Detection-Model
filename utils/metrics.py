@@ -21,3 +21,8 @@ def compute_clf_metrics(
     recall = recall_score(labels, preds, zero_division=0)
     f1 = f1_score(labels, preds, zero_division=0)
     auc_score = roc_auc_score(labels, probs) if len(np.unique(labels)) == 2 else float('nan')
+
+    # Find optimal threshold
+    optimal_threshold = float('nan')
+    threshold_optimized_accuracy = float('nan')
+    recall_at_01_fpr = float('nan')
