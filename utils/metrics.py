@@ -30,3 +30,13 @@ def compute_clf_metrics(
     if len(np.unique(labels)) == 2:
         # ROC curve
         fpr, tpr, thresholds = roc_curve(labels, probs)
+        # Find optimal threshold for accuracy
+        unique_probs = np.unique(probs)
+        if len(unique_probs) > 100:
+            percentiles = np.linspace(0, 100, 100)
+            threshold_candidates = np.percentile(unique_probs, percentiles)
+        else:
+            threshold_candidates = unique_probs
+        
+        best_accuracy = 0.0
+        optimal_threshold = 0.5
