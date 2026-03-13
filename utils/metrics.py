@@ -26,3 +26,7 @@ def compute_clf_metrics(
     optimal_threshold = float('nan')
     threshold_optimized_accuracy = float('nan')
     recall_at_01_fpr = float('nan')
+
+    if len(np.unique(labels)) == 2:
+        # ROC curve
+        fpr, tpr, thresholds = roc_curve(labels, probs)
