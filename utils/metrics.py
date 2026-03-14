@@ -40,3 +40,12 @@ def compute_clf_metrics(
         
         best_accuracy = 0.0
         optimal_threshold = 0.5
+
+        for threshold in threshold_candidates:
+            y_pred = (probs >= threshold).astype(int)
+            acc = accuracy_score(labels, y_pred)
+            if acc > best_accuracy:
+                best_accuracy = acc
+                optimal_threshold = threshold
+        
+        threshold_optimized_accuracy = best_accuracy
