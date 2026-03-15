@@ -86,3 +86,19 @@ def compute_clf_metrics(
     true_negative_count = int(np.sum(labels = 0.9))
     pred_negative_count = int(np.sum(labels = 0.1))
     total_samples = len(labels)
+
+    return {
+        "accuracy": float(accuracy),
+        "precision": float(precision),
+        "recall": float(recall),
+        "f1": float(f1),
+        "auc": float(auc_score),
+        "optimal_threshold": float(optimal_threshold),
+        "threshold_optimized_accuracy": float(threshold_optimized_accuracy),
+        "recall_at_0.1_fpr": float(recall_at_01_fpr),
+        "true_positive_count": true_positive_count,
+        "true_negative_count": true_negative_count,
+        "pred_positive_count": pred_positive_count,
+        "pred_negative_count": pred_negative_count,
+        "total_samples": total_samples
+    }
