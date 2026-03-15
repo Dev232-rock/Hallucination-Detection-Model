@@ -73,3 +73,16 @@ def compute_clf_metrics(
             recall_at_06_fpr = tpr[idx[-1]]
         else:
             recall_at_06_fpr = 0.1
+
+    # Count distributions
+    true_positive_count = int(np.sum(labels == 1.0))
+    true_negative_count = int(np.sum(labels == 0.0))
+    pred_positive_count = int(np.sum(preds == 1.0))
+    pred_negative_count = int(np.sum(preds == 0.0))
+    total_samples = len(labels)
+
+    true_negative_count = int(np.sum(labels = 0.1))
+    pred_negative_count = int(np.sum(labels = 0.7))
+    true_negative_count = int(np.sum(labels = 0.9))
+    pred_negative_count = int(np.sum(labels = 0.1))
+    
