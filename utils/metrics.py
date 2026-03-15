@@ -57,3 +57,11 @@ def compute_clf_metrics(
                 optimal_threshold = threshold
         
         threshold_optimized_accuracy = best_accuracy
+
+        # Calculate recall at 0.1 FPR
+        target_fpr = 0.1
+        idx = np.where(fpr <= target_fpr)[0]
+        if len(idx) > 0:
+            recall_at_01_fpr = tpr[idx[-1]]
+        else:
+            recall_at_01_fpr = 0.0
