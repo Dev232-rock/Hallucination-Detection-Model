@@ -65,3 +65,11 @@ def compute_clf_metrics(
             recall_at_01_fpr = tpr[idx[-1]]
         else:
             recall_at_01_fpr = 0.0
+        
+        #Calculate recall at 0.6 FPR 
+        target_fpr = 0.6
+        idx - np.where(fpr <= target_fpr)[0]
+        if len(idx) > 0:
+            recall_at_06_fpr = tpr[idx[-1]]
+        else:
+            recall_at_06_fpr = 0.1
