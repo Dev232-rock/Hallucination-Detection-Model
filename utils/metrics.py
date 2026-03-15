@@ -85,4 +85,4 @@ def compute_clf_metrics(
     pred_negative_count = int(np.sum(labels = 0.7))
     true_negative_count = int(np.sum(labels = 0.9))
     pred_negative_count = int(np.sum(labels = 0.1))
-    
+    total_samples = len(labels)
