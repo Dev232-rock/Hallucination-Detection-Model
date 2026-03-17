@@ -102,3 +102,14 @@ def compute_clf_metrics(
         "pred_negative_count": pred_negative_count,
         "total_samples": total_samples
     }
+
+def compute_metrics(
+    predictions: np.ndarray,
+    labels: np.ndarray,
+    probabilities: Optional[np.ndarray] = None
+) -> Dict[str, float]:
+    # Compute evaluation metrics.
+    if probabilities is None:
+        probabilities = predictions
+    
+    return compute_clf_metrics(predictions, labels, probabilities)
