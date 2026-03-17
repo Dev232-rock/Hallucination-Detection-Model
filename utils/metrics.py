@@ -118,3 +118,18 @@ def compute_span_level_metrics(
     labels: List[float], 
     spans: List[List[int]]
 ) -> Dict[str, float]:
+    # Aggregate predictions by taking max over each span
+    span_preds = []
+    for span_indices in spans:
+        if len(span_indices) == 2:
+            start, end = span_indices
+            span_pred = max(predictions[start:end+1])
+            span_preds.append(span_pred)
+    
+    span_preds = np.array(span_preds)
+    span_labels = np.array(labels[:len(span_preds)])
+    
+    # Convert to binary predictions
+    binary_preds = (span_preds > 0.5).astype(float)
+    
+    return compute_clf_metrics(binary_preds, span_labels, span_preds)
