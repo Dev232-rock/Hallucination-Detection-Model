@@ -113,3 +113,8 @@ def compute_metrics(
         probabilities = predictions
     
     return compute_clf_metrics(predictions, labels, probabilities)
+def compute_span_level_metrics(
+    predictions: List[float],
+    labels: List[float], 
+    spans: List[List[int]]
+) -> Dict[str, float]:
