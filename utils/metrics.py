@@ -141,3 +141,12 @@ def plot_roc_curves(
     save_dir: str,
     prefix: Optional[str] = None
 ) -> None:
+     
+    #Plot ROC curves for different aggregation levels.
+    os.makedirs(save_dir, exist_ok=True)
+    
+    plt.figure(figsize=(18, 6))
+    
+    fpr_targets = [0.05, 0.1, 0.2, 0.5]
+    dot_color = "black"
+    dot_size = 40
