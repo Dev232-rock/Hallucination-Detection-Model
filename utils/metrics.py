@@ -161,3 +161,8 @@ def plot_roc_curves(
         
         labels = np.array(all_labels[agg_level])
         probs = np.array(all_probs[agg_level])
+
+        if len(np.unique(labels)) < 2:
+            plt.title(f"{agg_level.replace('_', ' ').title()}\nInsufficient label diversity")
+            plt.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.7)
+            continue
