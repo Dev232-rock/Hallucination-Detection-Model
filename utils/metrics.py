@@ -133,3 +133,11 @@ def compute_span_level_metrics(
     binary_preds = (span_preds > 0.5).astype(float)
     
     return compute_clf_metrics(binary_preds, span_labels, span_preds)
+
+def plot_roc_curves(
+    all_preds: Dict[str, List[float]],
+    all_labels: Dict[str, List[float]], 
+    all_probs: Dict[str, List[float]],
+    save_dir: str,
+    prefix: Optional[str] = None
+) -> None:
