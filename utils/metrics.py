@@ -150,3 +150,14 @@ def plot_roc_curves(
     fpr_targets = [0.05, 0.1, 0.2, 0.5]
     dot_color = "black"
     dot_size = 40
+
+    for i, agg_level in enumerate(['all', 'span', 'span_max']):
+        plt.subplot(1, 3, i+1)
+        
+        if agg_level not in all_labels or len(all_labels[agg_level]) == 0:
+            plt.title(f"{agg_level.replace('_', ' ').title()}\nInsufficient data")
+            plt.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.7)
+            continue
+        
+        labels = np.array(all_labels[agg_level])
+        probs = np.array(all_probs[agg_level])
