@@ -166,3 +166,5 @@ def plot_roc_curves(
             plt.title(f"{agg_level.replace('_', ' ').title()}\nInsufficient label diversity")
             plt.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.7)
             continue
+        fpr, tpr, _ = roc_curve(labels, probs)
+        roc_auc = roc_auc_score(labels, probs)
