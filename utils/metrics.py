@@ -168,3 +168,7 @@ def plot_roc_curves(
             continue
         fpr, tpr, _ = roc_curve(labels, probs)
         roc_auc = roc_auc_score(labels, probs)
+
+        plt.fill_between(fpr, tpr, color="#f9c97d", alpha=0.5)
+        plt.plot(fpr, tpr, lw=2, color="black", label=f'ROC curve (AUC = {roc_auc:.2f})')
+        plt.plot([0, 1], [0, 1], 'w--', lw=2, alpha=0.7)
