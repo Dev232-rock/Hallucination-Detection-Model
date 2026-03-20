@@ -179,3 +179,9 @@ def plot_roc_curves(
         plt.fill_between(fpr, tpr, color="#f9c97d", alpha=0.5)
         plt.plot(fpr, tpr, lw=2, color="black", label=f'ROC curve (AUC = {roc_auc:.2f})')
         plt.plot([0, 1], [0, 1], 'w--', lw=2, alpha=0.7)
+
+         # Mark TPR at specific FPRs
+        for fpr_target in fpr_targets:
+            idx = np.argmin(np.abs(fpr - fpr_target))
+            plt.scatter(fpr[idx], tpr[idx], s=dot_size, color=dot_color, zorder=5)
+            plt.text(fpr[idx], tpr[idx]+0.03, f"{tpr[idx]:.4f}", fontsize=10, ha="center", color=dot_color)
