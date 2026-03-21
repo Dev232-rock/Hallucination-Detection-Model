@@ -193,3 +193,9 @@ def plot_roc_curves(
         plt.title(f"{agg_level.replace('_', ' ').title()}")
         plt.legend(loc="lower right")
         plt.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.7)
+
+    plt.tight_layout()
+    filename = f"{prefix}_roc_curves.png" if prefix else "roc_curves.png"
+    plt.savefig(os.path.join(save_dir, filename), dpi=300, bbox_inches='tight')
+    plt.close()
+    print(f"ROC curves saved to {os.path.join(save_dir, filename)}")
