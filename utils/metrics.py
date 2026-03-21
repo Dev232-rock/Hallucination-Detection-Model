@@ -185,3 +185,11 @@ def plot_roc_curves(
             idx = np.argmin(np.abs(fpr - fpr_target))
             plt.scatter(fpr[idx], tpr[idx], s=dot_size, color=dot_color, zorder=5)
             plt.text(fpr[idx], tpr[idx]+0.03, f"{tpr[idx]:.4f}", fontsize=10, ha="center", color=dot_color)
+
+        plt.xlim([0.0, 1.0])
+        plt.ylim([0.0, 1.05])
+        plt.xlabel('False Positive Rate')
+        plt.ylabel('True Positive Rate')
+        plt.title(f"{agg_level.replace('_', ' ').title()}")
+        plt.legend(loc="lower right")
+        plt.grid(True, which="both", linestyle="--", linewidth=0.5, alpha=0.7)
