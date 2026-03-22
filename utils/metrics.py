@@ -199,3 +199,18 @@ def plot_roc_curves(
     plt.savefig(os.path.join(save_dir, filename), dpi=300, bbox_inches='tight')
     plt.close()
     print(f"ROC curves saved to {os.path.join(save_dir, filename)}")
+
+def plot_roc_curve(fpr: np.ndarray, tpr: np.ndarray, save_path: str) -> None:
+    "Plot a single ROC curve."
+    plt.figure(figsize=(8, 6))
+    plt.plot(fpr, tpr, color='darkorange', lw=2)
+    plt.plot([0, 1], [0, 1], color='navy', lw=2, linestyle='--')
+    plt.xlim([0.0, 1.0])
+    plt.ylim([0.0, 1.05])
+    plt.xlabel('False Positive Rate')
+    plt.ylabel('True Positive Rate')
+    plt.title('Receiver Operating Characteristic')
+    plt.grid(True)
+    plt.savefig(save_path, dpi=300, bbox_inches='tight')
+    plt.close()
+
