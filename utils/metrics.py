@@ -214,3 +214,13 @@ def plot_roc_curve(fpr: np.ndarray, tpr: np.ndarray, save_path: str) -> None:
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
 
+def plot_threshold_analysis(
+    probabilities: np.ndarray,
+    labels: np.ndarray, 
+    save_path: str
+) -> None:
+    """Plot metrics vs threshold."""
+    thresholds = np.linspace(0, 1, 100)
+    accuracies = []
+    precisions = []
+    recalls = []
