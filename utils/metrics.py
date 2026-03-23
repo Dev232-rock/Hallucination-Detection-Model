@@ -219,8 +219,13 @@ def plot_threshold_analysis(
     labels: np.ndarray, 
     save_path: str
 ) -> None:
-    """Plot metrics vs threshold."""
+    #Plot metrics vs threshold.
     thresholds = np.linspace(0, 1, 100)
     accuracies = []
     precisions = []
     recalls = []
+    for threshold in thresholds:
+        preds = (probabilities >= threshold).astype(int)
+        accuracies.append(accuracy_score(labels, preds))
+        precisions.append(precision_score(labels, preds, zero_division=0))
+        recalls.append(recall_score(labels, preds, zero_division=0))
