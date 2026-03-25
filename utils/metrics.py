@@ -261,4 +261,12 @@ def print_eval_metrics(
         print("\nLoss Metrics:")
         print(f" - LM Loss:     {metrics.get(f'{prefix}lm_loss', 0):.4f}")
         print(f" - Probe Loss:  {metrics.get(f'{prefix}probe_loss', 0):.4f}")
-        print(f" - Sparsity:    {metrics.get(f'{prefix}sparsity', 0):.4f}")
+        print(f" - Sparsity:    {metrics.get(f'{prefix}sparsity', 0):.4f}")\
+        
+# Print classification metrics for different aggregation levels
+    for agg_level in ['all', 'span', 'span_max']:
+        if f'{prefix}{agg_level}_accuracy' in metrics:
+            print(f"\n{agg_level.replace('_', ' ').title()} - Classification Metrics:")
+            print(f" - Accuracy:   {metrics[f'{prefix}{agg_level}_accuracy']:.4f}")
+            print(f" - Precision:  {metrics[f'{prefix}{agg_level}_precision']:.4f}")
+            print(f" - Recall:     {metrics[f'{prefix}{agg_level}_recall']:.4f}")
