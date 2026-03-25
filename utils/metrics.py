@@ -241,3 +241,17 @@ def plot_threshold_analysis(
     plt.grid(True)
     plt.savefig(save_path, dpi=300, bbox_inches='tight')
     plt.close()
+
+def print_eval_metrics(
+    metrics: dict,
+    metric_key_prefix: str = "",
+    all_labels: Optional[dict] = None,
+    include_random_baseline: bool = True,
+    seed: int = 42,
+) -> None:
+    if metric_key_prefix:
+        print(f"\n===== Evaluation Metrics ({metric_key_prefix}) =====")
+    else:
+        print("\n===== Evaluation Metrics =====")
+    
+    prefix = metric_key_prefix + "/" if metric_key_prefix else ""
