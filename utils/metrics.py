@@ -255,3 +255,10 @@ def print_eval_metrics(
         print("\n===== Evaluation Metrics =====")
     
     prefix = metric_key_prefix + "/" if metric_key_prefix else ""
+
+        # Print loss metrics if available
+    if f'{prefix}lm_loss' in metrics:
+        print("\nLoss Metrics:")
+        print(f" - LM Loss:     {metrics.get(f'{prefix}lm_loss', 0):.4f}")
+        print(f" - Probe Loss:  {metrics.get(f'{prefix}probe_loss', 0):.4f}")
+        print(f" - Sparsity:    {metrics.get(f'{prefix}sparsity', 0):.4f}")
