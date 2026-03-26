@@ -271,3 +271,11 @@ def print_eval_metrics(
             print(f" - Precision:  {metrics[f'{prefix}{agg_level}_precision']:.4f}")
             print(f" - Recall:     {metrics[f'{prefix}{agg_level}_recall']:.4f}")
             print(f" - F1 Score:   {metrics[f'{prefix}{agg_level}_f1']:.4f}")
+
+            if f'{prefix}{agg_level}_auc' in metrics:
+                print(f" - AUC:        {metrics[f'{prefix}{agg_level}_auc']:.4f}")
+            if f'{prefix}{agg_level}_recall_at_0.1_fpr' in metrics:
+                print(f" - Recall @ 0.1 FPR: {metrics[f'{prefix}{agg_level}_recall_at_0.1_fpr']:.4f}")
+            if f'{prefix}{agg_level}_threshold_optimized_accuracy' in metrics:
+                print(f" - Optimized Accuracy: {metrics[f'{prefix}{agg_level}_threshold_optimized_accuracy']:.4f}")
+                print(f"   (Optimal Threshold: {metrics[f'{prefix}{agg_level}_optimal_threshold']:.4f})")
