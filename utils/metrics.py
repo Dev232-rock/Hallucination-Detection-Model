@@ -279,3 +279,7 @@ def print_eval_metrics(
             if f'{prefix}{agg_level}_threshold_optimized_accuracy' in metrics:
                 print(f" - Optimized Accuracy: {metrics[f'{prefix}{agg_level}_threshold_optimized_accuracy']:.4f}")
                 print(f"   (Optimal Threshold: {metrics[f'{prefix}{agg_level}_optimal_threshold']:.4f})")
+
+            # Print baselines if labels provided
+            if all_labels and agg_level in all_labels:
+                labels = np.array(all_labels[agg_level])
