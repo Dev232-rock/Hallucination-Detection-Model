@@ -270,3 +270,4 @@ def print_eval_metrics(
             print(f" - Accuracy:   {metrics[f'{prefix}{agg_level}_accuracy']:.4f}")
             print(f" - Precision:  {metrics[f'{prefix}{agg_level}_precision']:.4f}")
             print(f" - Recall:     {metrics[f'{prefix}{agg_level}_recall']:.4f}")
+            print(f" - F1 Score:   {metrics[f'{prefix}{agg_level}_f1']:.4f}")
