@@ -283,3 +283,10 @@ def print_eval_metrics(
             # Print baselines if labels provided
             if all_labels and agg_level in all_labels:
                 labels = np.array(all_labels[agg_level])
+                if len(labels) > 0:
+                    # Majority class baseline
+                    majority_class = 1 if np.sum(labels) >= len(labels) / 2 else 0
+                    majority_baseline = accuracy_score(labels, np.full_like(labels, majority_class))
+                    print(f"    (Majority baseline: {majority_baseline:.4f})")
+    
+    print("\n==============================\n")
