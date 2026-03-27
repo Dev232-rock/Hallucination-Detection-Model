@@ -1,15 +1,18 @@
-import os
-from typing import Dict, List, Optional, Tuple
+"""Model loading and setup utilities."""
 
-import numpy as np
-import matplotlib.pyplot as plt
-from sklearn.metrics import accuracy_score, precision_score, recall_score, f1_score, roc_auc_score, roc_curve
+from typing import List, Optional, Tuple, Union
+
+import torch
+import torch.nn as nn
+from peft import PeftModel, LoraConfig, get_peft_model
+from transformers import AutoModelForCausalLM, AutoTokenizer, BitsAndBytesConfig, PreTrainedModel
 
 
-def compute_clf_metrics(
-    preds: np.ndarray,
-    labels: np.ndarray, 
-    probs: np.ndarray
-) -> Dict[str, float]:
-    # Compute classification metrics
-    assert all((labels == 0.0) | (labels == 1.0)), "labels must be either 0 or 1"
+def get_device() -> torch.device:
+    'Get the best available device (CUDA, MPS, or CPU).'
+    if torch.cuda.is_available():
+        return torch.device("cuda")
+    elif torch.backends.mps.is_available():
+        return torch.device("mps")
+    else:
+        return torch.device("cpu")
