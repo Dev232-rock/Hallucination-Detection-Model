@@ -25,3 +25,15 @@ def load_model_and_tokenizer(
      # Set default dtype
     if torch_dtype is None:
         torch_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+
+         # Set default dtype
+    if torch_dtype is None:
+        torch_dtype = torch.bfloat16 if torch.cuda.is_bf16_supported() else torch.float16
+    
+    # Load model
+    model = AutoModelForCausalLM.from_pretrained(
+        model_name,
+        device_map=device_map,
+        torch_dtype=torch_dtype,
+        trust_remote_code=True,
+    )
