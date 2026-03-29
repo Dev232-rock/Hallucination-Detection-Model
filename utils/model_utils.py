@@ -37,3 +37,16 @@ def load_model_and_tokenizer(
         torch_dtype=torch_dtype,
         trust_remote_code=True,
     )
+    # Load tokenizer
+    tokenizer = AutoTokenizer.from_pretrained(
+        model_name,
+        trust_remote_code=True,
+        padding_side='right'
+    )
+    
+    # Set padding token if not set
+    if tokenizer.pad_token is None:
+        tokenizer.pad_token = tokenizer.eos_token
+    
+    return model, tokenizer
+
