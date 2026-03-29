@@ -49,4 +49,17 @@ def load_model_and_tokenizer(
         tokenizer.pad_token = tokenizer.eos_token
     
     return model, tokenizer
-
+def setup_model_with_lora(
+    model: AutoModelForCausalLM,
+    lora_config: dict,
+    lora_weights_path: Optional[str] = None,
+) -> PeftModel:
+    # Setup a model with LoRA adapters and Create LoRA configuration
+    peft_config = LoraConfig(
+        r=lora_config.get("r", 16),
+        lora_alpha=lora_config.get("alpha", 32),
+        lora_dropout=lora_config.get("dropout", 0.05),
+        bias="none",
+        task_type="CAUSAL_LM",
+        target_modules=lora_config.get("target_modules", ["q_proj", "v_proj"]),
+    )
