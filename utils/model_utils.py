@@ -63,3 +63,12 @@ def setup_model_with_lora(
         task_type="CAUSAL_LM",
         target_modules=lora_config.get("target_modules", ["q_proj", "v_proj"]),
     )
+  # Apply LoRA to model
+    if lora_weights_path:
+        # Load pre-trained LoRA weights
+        model = PeftModel.from_pretrained(model, lora_weights_path)
+    else:
+        # Initialize new LoRA adapters
+        model = get_peft_model(model, peft_config)
+    
+    return model
