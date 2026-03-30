@@ -72,3 +72,11 @@ def setup_model_with_lora(
         model = get_peft_model(model, peft_config)
     
     return model
+
+    def get_model_layers(model: PreTrainedModel) -> List[nn.Module]:
+    # Get the list of transformer layers from a model.
+    # Handle PeftModel by getting the base model
+    if isinstance(model, PeftModel):
+        base_model = model.get_base_model()
+    else:
+        base_model = model
