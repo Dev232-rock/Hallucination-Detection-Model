@@ -80,3 +80,20 @@ def setup_model_with_lora(
         base_model = model.get_base_model()
     else:
         base_model = model
+
+
+     # Common patterns for accessing layers in different model architectures
+    if hasattr(base_model, 'model') and hasattr(base_model.model, 'layers'):
+        # LLaMA, Mistral, etc.
+        return list(base_model.model.layers)
+    elif hasattr(base_model, 'transformer') and hasattr(base_model.transformer, 'h'):
+        # GPT-2, GPT-J, etc.
+        return list(base_model.transformer.h)
+    elif hasattr(base_model, 'encoder') and hasattr(base_model.encoder, 'layer'):
+        # BERT, RoBERTa, etc.
+        return list(base_model.encoder.layer)
+    elif hasattr(base_model, 'gpt_neox') and hasattr(base_model.gpt_neox, 'layers'):
+        # GPT-NeoX
+        return list(base_model.gpt_neox.layers)
+    else:
+        raise ValueError(f"Unknown model architecture: {type(base_model)}")
