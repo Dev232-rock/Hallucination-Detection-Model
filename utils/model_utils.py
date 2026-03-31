@@ -97,3 +97,32 @@ def setup_model_with_lora(
         return list(base_model.gpt_neox.layers)
     else:
         raise ValueError(f"Unknown model architecture: {type(base_model)}")
+    
+    def get_num_layers(model_or_name: Union[str, PreTrainedModel]) -> int:
+    """
+    Get the number of transformer layers in a model.
+    
+    Args:
+        model_or_name: Either a model name string or a transformer model
+    
+    Returns:
+        Number of layers
+    """
+    # If it's a string (model name), use the predefined mapping
+    if isinstance(model_or_name, str):
+        model_layers_map = {
+            "meta-llama/Meta-Llama-3.1-8B-Instruct": 32,
+            "meta-llama/Meta-Llama-3.1-70B-Instruct": 80,
+            "meta-llama/Meta-Llama-3.1-405B-Instruct": 126,
+            "google/gemma-2-2b-it": 26,
+            "google/gemma-2-9b-it": 42,
+            "google/gemma-2-27b-it": 46,
+            "Qwen/Qwen2.5-0.5B-Instruct": 24,
+            "Qwen/Qwen2.5-1.5B-Instruct": 28,
+            "Qwen/Qwen2.5-3B-Instruct": 36,
+            "Qwen/Qwen2.5-7B-Instruct": 28,
+            "Qwen/Qwen2.5-14B-Instruct": 48,
+            "Qwen/Qwen2.5-32B-Instruct": 64,
+            "meta-llama/Llama-3.3-70B-Instruct": 80,
+            "mistralai/Mistral-Small-24B-Instruct-2501": 40,
+        }
