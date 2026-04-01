@@ -99,15 +99,7 @@ def setup_model_with_lora(
         raise ValueError(f"Unknown model architecture: {type(base_model)}")
     
     def get_num_layers(model_or_name: Union[str, PreTrainedModel]) -> int:
-    """
-    Get the number of transformer layers in a model.
-    
-    Args:
-        model_or_name: Either a model name string or a transformer model
-    
-    Returns:
-        Number of layers
-    """
+    # Get the number of transformer layers in a model\.
     # If it's a string (model name), use the predefined mapping
     if isinstance(model_or_name, str):
         model_layers_map = {
@@ -126,3 +118,10 @@ def setup_model_with_lora(
             "meta-llama/Llama-3.3-70B-Instruct": 80,
             "mistralai/Mistral-Small-24B-Instruct-2501": 40,
         }
+        if model_or_name in model_layers_map:
+            return model_layers_map[model_or_name]
+        else:
+            raise ValueError(f"Model {model_or_name} not supported. Please add it to the model_layers_map.")
+    
+    # If it's a model instance, count the layers
+    return len(get_model_layers(model_or_name))
