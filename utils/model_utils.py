@@ -125,3 +125,12 @@ def setup_model_with_lora(
     
     # If it's a model instance, count the layers
     return len(get_model_layers(model_or_name))
+
+
+    def get_model_layers_prefix(model: PreTrainedModel) -> str:
+    #Get the prefix path to the model layers.
+    # Handle PeftModel
+    if isinstance(model, PeftModel):
+        base_model = model.get_base_model()
+    else:
+        base_model = model
