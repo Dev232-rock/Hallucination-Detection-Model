@@ -128,9 +128,20 @@ def setup_model_with_lora(
 
 
     def get_model_layers_prefix(model: PreTrainedModel) -> str:
-    #Get the prefix path to the model layers.
+        #Get the prefix path to the model layers.
     # Handle PeftModel
-    if isinstance(model, PeftModel):
-        base_model = model.get_base_model()
+        if isinstance(model, PeftModel):
+            base_model = model.get_base_model()
+        else:
+            base_model = model
+
+    if hasattr(base_model, 'model') and hasattr(base_model.model, 'layers'):
+        return "model.layers"
+    elif hasattr(base_model, 'transformer') and hasattr(base_model.transformer, 'h'):
+        return "transformer.h"
+    elif hasattr(base_model, 'encoder') and hasattr(base_model.encoder, 'layer'):
+        return "encoder.layer"
+    elif hasattr(base_model, 'gpt_neox') and hasattr(base_model.gpt_neox, 'layers'):
+        return "gpt_neox.layers"
     else:
-        base_model = model
+        raise ValueError(f"Unknown model architecture: {type(base_model)}")
