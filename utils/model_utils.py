@@ -145,3 +145,11 @@ def setup_model_with_lora(
         return "gpt_neox.layers"
     else:
         raise ValueError(f"Unknown model architecture: {type(base_model)}")
+
+def get_model_hidden_size(model: PreTrainedModel) -> int:
+    # Get the hidden size of a transformer model.
+    # Handle PeftModel
+    if isinstance(model, PeftModel):
+        base_model = model.get_base_model()
+    else:
+        base_model = model
