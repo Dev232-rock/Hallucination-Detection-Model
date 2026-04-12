@@ -163,4 +163,14 @@ def get_model_hidden_size(model: PreTrainedModel) -> int:
     if hasattr(base_model, 'model') and hasattr(base_model.model, 'embed_tokens'):
         return base_model.model.embed_tokens.weight.shape[1]
     
-    raise ValueError(f"Could not determine hidden size for model type {type(base_model)}")            
+    raise ValueError(f"Could not determine hidden size for model type {type(base_model)}")     
+
+def setup_lora_for_layers(
+    model: PreTrainedModel,
+    layer_indices: List[int],
+    lora_r: int = 16,
+    lora_alpha: int = 32,
+    lora_dropout: float = 0.05,
+    bias: str = "none",
+) -> Union[PeftModel, PreTrainedModel]:       
+    #  Setup LoRA adapters for specific layers in a model.
