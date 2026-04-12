@@ -153,3 +153,9 @@ def get_model_hidden_size(model: PreTrainedModel) -> int:
         base_model = model.get_base_model()
     else:
         base_model = model
+    if hasattr(base_model, 'config'):
+        config = base_model.config
+        # Try common attribute names
+        for attr in ['hidden_size', 'd_model', 'n_embd', 'embed_dim']:
+            if hasattr(config, attr):
+                return getattr(config, attr)
