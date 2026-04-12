@@ -159,3 +159,8 @@ def get_model_hidden_size(model: PreTrainedModel) -> int:
         for attr in ['hidden_size', 'd_model', 'n_embd', 'embed_dim']:
             if hasattr(config, attr):
                 return getattr(config, attr)
+     # If we can't find it in config, try to infer from the model structure
+    if hasattr(base_model, 'model') and hasattr(base_model.model, 'embed_tokens'):
+        return base_model.model.embed_tokens.weight.shape[1]
+    
+    raise ValueError(f"Could not determine hidden size for model type {type(base_model)}")            
