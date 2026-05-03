@@ -193,3 +193,5 @@ def setup_lora_for_layers(
     for layer_idx in layer_indices:
         for module_suffix in module_suffixes:
             target_modules.append(f"{layer_prefix}.{layer_idx}.{module_suffix}")
+
+    print(f"Creating LoRA adapters for layers {layer_indices}...")
