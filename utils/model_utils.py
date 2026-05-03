@@ -178,3 +178,6 @@ def setup_lora_for_layers(
     if not layer_indices:
         print("No LoRA layers specified, returning base model")
         return model
+    
+    # Get the layer prefix for this model architecture
+    layer_prefix = get_model_layers_prefix(model)
