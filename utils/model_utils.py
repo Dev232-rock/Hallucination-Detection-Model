@@ -195,3 +195,13 @@ def setup_lora_for_layers(
             target_modules.append(f"{layer_prefix}.{layer_idx}.{module_suffix}")
 
     print(f"Creating LoRA adapters for layers {layer_indices}...")
+
+     # Create LoRA config
+    lora_config = LoraConfig(
+        r=lora_r,
+        lora_alpha=lora_alpha,
+        lora_dropout=lora_dropout,
+        bias=bias,
+        target_modules=target_modules,
+        task_type="CAUSAL_LM",
+    )
