@@ -174,3 +174,7 @@ def setup_lora_for_layers(
     bias: str = "none",
 ) -> Union[PeftModel, PreTrainedModel]:       
     #  Setup LoRA adapters for specific layers in a model.
+
+    if not layer_indices:
+        print("No LoRA layers specified, returning base model")
+        return model
