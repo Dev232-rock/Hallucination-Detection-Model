@@ -181,3 +181,11 @@ def setup_lora_for_layers(
     
     # Get the layer prefix for this model architecture
     layer_prefix = get_model_layers_prefix(model)
+
+
+    # Build target modules list for the specified layers
+    target_modules = []
+    module_suffixes = [
+        "self_attn.q_proj", "self_attn.k_proj", "self_attn.v_proj", "self_attn.o_proj",
+        "mlp.gate_proj", "mlp.up_proj", "mlp.down_proj"
+    ]
