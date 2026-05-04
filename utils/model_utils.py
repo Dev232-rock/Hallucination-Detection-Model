@@ -205,3 +205,6 @@ def setup_lora_for_layers(
         target_modules=target_modules,
         task_type="CAUSAL_LM",
     )
+
+    # Apply LoRA to model
+    return get_peft_model(model, lora_config)
