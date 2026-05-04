@@ -208,3 +208,8 @@ def setup_lora_for_layers(
 
     # Apply LoRA to model
     return get_peft_model(model, lora_config)
+
+def print_trainable_parameters(model: nn.Module) -> Tuple[int, int]:
+    # Print information about trainable parameters in a model.
+    trainable_params = 0
+    total_params = 0
