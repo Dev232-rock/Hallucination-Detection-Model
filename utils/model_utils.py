@@ -224,3 +224,4 @@ def print_trainable_parameters(model: nn.Module) -> Tuple[int, int]:
     trainable_params_percentage = 100 * trainable_params / total_params
     print(f"\nTotal trainable parameters: {trainable_params:,} ({trainable_params_percentage:.2f}%)")
     print(f"Total parameters: {total_params:,}")
+     return trainable_params, total_params
