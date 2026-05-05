@@ -215,3 +215,8 @@ def print_trainable_parameters(model: nn.Module) -> Tuple[int, int]:
     total_params = 0
 
     print("Parameters that will be trained:")
+    for name, param in model.named_parameters():
+        if param.requires_grad:
+            trainable_params += param.numel()
+            print(f"  - {name}: shape {param.shape}, device {param.device}")
+        total_params += param.numel()
