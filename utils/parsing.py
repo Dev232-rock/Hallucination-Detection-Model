@@ -34,3 +34,7 @@ def parse_and_validate_json(
 
      # Find JSON structure (object or array)
     json_match = re.search(r'(\{.*\}|\[.*\])', cleaned_response, flags=re.DOTALL)
+    if not json_match:
+        raise ValueError(
+            f"No valid JSON object or array found in response: {llm_response[:200]}..."
+        )
