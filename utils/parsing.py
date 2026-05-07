@@ -38,3 +38,4 @@ def parse_and_validate_json(
         raise ValueError(
             f"No valid JSON object or array found in response: {llm_response[:200]}..."
         )
+    json_str = json_match.group(0).strip()
