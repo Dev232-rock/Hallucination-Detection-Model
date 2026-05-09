@@ -39,3 +39,12 @@ def parse_and_validate_json(
             f"No valid JSON object or array found in response: {llm_response[:200]}..."
         )
     json_str = json_match.group(0).strip()
+    
+    try:
+        # Parse JSON
+        parsed = from_json(json_str, allow_partial=allow_partial)
+        
+        # Validate against schema
+        validated_data = parse_obj_as(schema, parsed)
+        
+        return validated_data
