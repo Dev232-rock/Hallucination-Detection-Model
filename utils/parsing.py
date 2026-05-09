@@ -14,16 +14,7 @@ def parse_and_validate_json(
     schema: Union[Type[BaseModel], Any], 
     allow_partial: bool = False
 ) -> Any:
-    ''' Parse and validate JSON from an LLM response.
-    
-    This function:
-    1. Normalizes the text to handle encoding issues
-    2. Removes markdown code fences
-    3. Extracts the JSON structure
-    4. Parses and validates against the provided schema
-    """
-    # Normalize text to handle control characters
-    cleaned_response = normalize_text(llm_response)'''
+    # Parse and validate JSON from an LLM response.
     
     # Remove markdown code fences (```json or ```)
     cleaned_response = re.sub(
@@ -53,3 +44,10 @@ def parse_and_validate_json(
             f"Error parsing/validating JSON: {e}\n"
             f"JSON string: {json_str[:200]}..."
         ) from e
+def validate_dicts_to_pydantic(
+    dicts: List[dict],
+    model: Type[T],
+    skip_invalid: bool = False
+) -> List[T]:
+    # Validate a list of dictionaries against a Pydantic model. 
+     validated = []
