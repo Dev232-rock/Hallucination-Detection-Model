@@ -51,3 +51,8 @@ def validate_dicts_to_pydantic(
 ) -> List[T]:
     # Validate a list of dictionaries against a Pydantic model. 
      validated = []
+
+     for i, item_dict in enumerate(dicts):
+        try:
+            validated_item = model.model_validate(item_dict)
+            validated.append(validated_item)
