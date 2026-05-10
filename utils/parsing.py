@@ -56,3 +56,10 @@ def validate_dicts_to_pydantic(
         try:
             validated_item = model.model_validate(item_dict)
             validated.append(validated_item)
+        except Exception as e:
+            if skip_invalid:
+                # Silently skip invalid items
+                continueexcept Exception as e:
+            if skip_invalid:
+                # Silently skip invalid items
+                continue
