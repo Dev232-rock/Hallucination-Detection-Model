@@ -63,3 +63,7 @@ def validate_dicts_to_pydantic(
             if skip_invalid:
                 # Silently skip invalid items
                 continue
+            else:
+                raise ValueError(
+                    f"Validation failed for item {i}: {e}"
+                ) from e
