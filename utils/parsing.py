@@ -67,3 +67,5 @@ def validate_dicts_to_pydantic(
                 raise ValueError(
                     f"Validation failed for item {i}: {e}"
                 ) from e
+
+     return validated
