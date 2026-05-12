@@ -12,3 +12,13 @@ from huggingface_hub.utils import validate_repo_id
 
 # Default directory for saving probes locally
 LOCAL_PROBES_DIR = Path(__file__).parent.parent / "value_head_probes"
+
+def download_probe_from_hf(
+    repo_id: str,
+    probe_id: Optional[str] = None,
+    local_folder: Optional[Union[str, Path]] = None,
+    hf_repo_subfolder_prefix: str = "",
+    token: Optional[str] = None
+) -> None:
+    """Simplified probe download function for Modal."""
+    api = HfApi()
