@@ -20,5 +20,5 @@ def download_probe_from_hf(
     hf_repo_subfolder_prefix: str = "",
     token: Optional[str] = None
 ) -> None:
-    """Simplified probe download function for Modal."""
+    # Simplified probe download function for Modal.
     api = HfApi()
