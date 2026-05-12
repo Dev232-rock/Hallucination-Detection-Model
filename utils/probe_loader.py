@@ -22,3 +22,6 @@ def download_probe_from_hf(
 ) -> None:
     # Simplified probe download function for Modal.
     api = HfApi()
+
+    if local_folder is None:
+        local_folder = LOCAL_PROBES_DIR / probe_id
