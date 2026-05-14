@@ -36,3 +36,6 @@ def download_probe_from_hf(
         repo_type="model",
         revision="main"
     )
+     # Filter files by subfolder
+    path_in_repo = os.path.join(hf_repo_subfolder_prefix, probe_id)
+    subfolder_files = [f for f in repo_files if f.startswith(f"{path_in_repo}/")]
