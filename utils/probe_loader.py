@@ -27,3 +27,7 @@ def download_probe_from_hf(
         local_folder = LOCAL_PROBES_DIR / probe_id
     elif isinstance(local_folder, str):
         local_folder = Path(local_folder)
+
+    local_folder.mkdir(parents=True, exist_ok=True)
+
+    
