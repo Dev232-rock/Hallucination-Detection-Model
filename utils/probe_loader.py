@@ -39,3 +39,8 @@ def download_probe_from_hf(
      # Filter files by subfolder
     path_in_repo = os.path.join(hf_repo_subfolder_prefix, probe_id)
     subfolder_files = [f for f in repo_files if f.startswith(f"{path_in_repo}/")]
+
+     # Download each file
+    for file_path in subfolder_files:
+        # Get relative path within subfolder
+        relative_path = file_path[len(path_in_repo):].lstrip('/')
