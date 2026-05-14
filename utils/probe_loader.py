@@ -44,3 +44,7 @@ def download_probe_from_hf(
     for file_path in subfolder_files:
         # Get relative path within subfolder
         relative_path = file_path[len(path_in_repo):].lstrip('/')
+
+     # Create subdirectory if needed
+        local_file_path = local_folder / relative_path
+        local_file_path.parent.mkdir(parents=True, exist_ok=True)
