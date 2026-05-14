@@ -30,4 +30,9 @@ def download_probe_from_hf(
 
     local_folder.mkdir(parents=True, exist_ok=True)
 
-    
+    # List files in the repository subfolder
+    repo_files = api.list_repo_files(
+        repo_id=repo_id,
+        repo_type="model",
+        revision="main"
+    )
