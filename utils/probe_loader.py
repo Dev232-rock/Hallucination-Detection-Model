@@ -48,3 +48,12 @@ def download_probe_from_hf(
      # Create subdirectory if needed
         local_file_path = local_folder / relative_path
         local_file_path.parent.mkdir(parents=True, exist_ok=True)
+
+
+    # Download file
+        downloaded_file = hf_hub_download(
+            repo_id=repo_id,
+            filename=file_path,
+            token=token
+        )
+        
