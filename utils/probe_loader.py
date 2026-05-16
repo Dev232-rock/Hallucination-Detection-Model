@@ -58,3 +58,5 @@ def download_probe_from_hf(
         )
         # Copy to destination
         shutil.copy(downloaded_file, local_file_path)
+
+        print(f"Downloaded probe to {local_folder}")
