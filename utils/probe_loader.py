@@ -70,3 +70,7 @@ def download_probe_from_hf(
                 private: bool = False,
                 commit_message: str = "Upload probe model"
                 ) -> str:
+    ''' Uploads a probe (LoRA adapters + value head) to HuggingFace Hub. '''
+    
+    # Validate inputs
+    validate_repo_id(repo_id)
