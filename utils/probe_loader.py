@@ -84,3 +84,7 @@ def download_probe_from_hf(
         raise ValueError(f"Probe directory {probe_dir} does not exist")
 
     path_in_repo = os.path.join(hf_repo_subfolder_prefix, probe_id)
+
+    # Login if token is provided
+    if token:
+        login(token=token)
