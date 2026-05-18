@@ -82,3 +82,5 @@ def download_probe_from_hf(
 
     if not local_folder.exists():
         raise ValueError(f"Probe directory {probe_dir} does not exist")
+
+    path_in_repo = os.path.join(hf_repo_subfolder_prefix, probe_id)
