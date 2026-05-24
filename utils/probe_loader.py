@@ -96,3 +96,6 @@ def download_probe_from_hf(
         private=private,
         token=token
     )
+
+     # Copy to destination
+        shutil.copy(downloaded_file, local_file_path)
