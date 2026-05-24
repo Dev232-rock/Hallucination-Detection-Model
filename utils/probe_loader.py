@@ -101,3 +101,7 @@ def download_probe_from_hf(
     shutil.copy(downloaded_file, local_file_path)
 
     print(f"Downloaded probe to {local_folder}")
+
+    def upload_probe_to_hf(
+    repo_id: str,
+    probe_id: Optional[str] = None,
