@@ -118,3 +118,5 @@ def download_probe_from_hf(
         local_folder = LOCAL_PROBES_DIR / probe_id
     elif isinstance(local_folder, str):
         local_folder = Path(local_folder)
+    if not local_folder.exists():
+        raise ValueError(f"Probe directory {probe_dir} does not exist")
