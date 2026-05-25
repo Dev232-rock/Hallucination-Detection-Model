@@ -114,3 +114,5 @@ def download_probe_from_hf(
         # Uploads a probe (LoRA adapters + value head) to HuggingFace Hub.
         # Validate inputs
     validate_repo_id(repo_id) 
+    if local_folder is None:
+        local_folder = LOCAL_PROBES_DIR / probe_id
