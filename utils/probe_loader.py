@@ -107,3 +107,5 @@ def download_probe_from_hf(
     probe_id: Optional[str] = None,
     local_folder: Optional[Union[str, Path]] = None,
     hf_repo_subfolder_prefix: str = "",
+    token: Optional[str] = None,
+    private: bool = False,
