@@ -109,3 +109,5 @@ def download_probe_from_hf(
     hf_repo_subfolder_prefix: str = "",
     token: Optional[str] = None,
     private: bool = False,
+    commit_message: str = "Upload probe model"
+) -> str:
