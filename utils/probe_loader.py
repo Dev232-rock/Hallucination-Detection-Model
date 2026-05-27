@@ -131,3 +131,5 @@ def download_probe_from_hf(
         repo_id=repo_id,
         exist_ok=True,
         private=private,
+        token=token
+    )
