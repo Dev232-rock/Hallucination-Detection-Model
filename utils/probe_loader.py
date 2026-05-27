@@ -129,3 +129,5 @@ def download_probe_from_hf(
     # Create repo if it doesn't exist
     api.create_repo(
         repo_id=repo_id,
+        exist_ok=True,
+        private=private,
