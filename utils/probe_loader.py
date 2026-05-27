@@ -126,3 +126,6 @@ def download_probe_from_hf(
     if token:
         login(token=token)
     api = HfApi()
+    # Create repo if it doesn't exist
+    api.create_repo(
+        repo_id=repo_id,
