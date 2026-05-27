@@ -125,3 +125,4 @@ def download_probe_from_hf(
     # Login if token is provided
     if token:
         login(token=token)
+    api = HfApi()
