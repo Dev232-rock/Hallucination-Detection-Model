@@ -133,3 +133,5 @@ def download_probe_from_hf(
         private=private,
         token=token
     )
+
+    print(f"Uploading folder {local_folder} to {repo_id}...")
