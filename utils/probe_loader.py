@@ -135,3 +135,6 @@ def download_probe_from_hf(
     )
 
     print(f"Uploading folder {local_folder} to {repo_id}...")
+     api.upload_folder(
+        folder_path=str(local_folder),
+        repo_id=repo_id,
