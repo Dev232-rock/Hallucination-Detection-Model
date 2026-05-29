@@ -143,3 +143,5 @@ def download_probe_from_hf(
          commit_message=commit_message,
         token=token,
     )
+      # Return the URL
+    url = f"https://huggingface.co/{repo_id}"
