@@ -140,3 +140,5 @@ def download_probe_from_hf(
         repo_id=repo_id,
         repo_type="model",
         path_in_repo=path_in_repo,
+        path_in_repo=path_in_repo,
+        commit_message=commit_message,
