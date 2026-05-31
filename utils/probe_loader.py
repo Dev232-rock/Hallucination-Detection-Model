@@ -149,3 +149,4 @@ def download_probe_from_hf(
         url += f"/tree/main/{repo_subfolder}"
 
     print(f"Successfully uploaded probe to {url}")
+    return url
