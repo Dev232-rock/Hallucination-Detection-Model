@@ -144,4 +144,6 @@ def download_probe_from_hf(
         token=token,
     )
       # Return the URL
-    url = f"https://huggingface.co/{repo_id}"
+    url = f"https://huggingface.co/{repo_id}"  
+    if repo_subfolder:
+        url += f"/tree/main/{repo_subfolder}"
