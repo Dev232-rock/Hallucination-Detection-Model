@@ -11,5 +11,8 @@ def normalize_text(text: str) -> str:
 
     # Remove control characters except newline, tab, and carriage return
     text = re.sub(r'[\x00-\x08\x0B\x0C\x0E-\x1F\x7F]', '', text)
-     # Replace Unicode spaces with regular spaces
+    # Replace Unicode spaces with regular spaces
     text = re.sub(r'[\u00A0\u1680\u2000-\u200B\u202F\u205F\u3000\uFEFF]', ' ', text)
+
+    # Replace Unicode quotes with standard quotes
+    text = re.sub(r'[\u201C\u201D\u2018\u2019\u201E\u201F\u2039\u203A\u00AB\u00BB]', '"', text)
