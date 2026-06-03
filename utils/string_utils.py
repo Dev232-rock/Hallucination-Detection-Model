@@ -25,3 +25,5 @@ def normalize_text(text: str) -> str:
 
     # Normalize line endings
     text = text.replace('\r\n', '\n').replace('\r', '\n')
+
+    return text
