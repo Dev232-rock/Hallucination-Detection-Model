@@ -19,3 +19,6 @@ def normalize_text(text: str) -> str:
 
     # Replace Unicode quotes with standard quotes
     text = re.sub(r'[\u201C\u201D\u2018\u2019\u201E\u201F\u2039\u203A\u00AB\u00BB]', '"', text)
+
+    # Replace Unicode dashes with standard dash
+    text = re.sub(r'[\u2013\u2014\u2015]', '-', text)
