@@ -22,3 +22,6 @@ def normalize_text(text: str) -> str:
 
     # Replace Unicode dashes with standard dash
     text = re.sub(r'[\u2013\u2014\u2015]', '-', text)
+
+    # Normalize line endings
+    text = text.replace('\r\n', '\n').replace('\r', '\n')
