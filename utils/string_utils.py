@@ -27,3 +27,8 @@ def normalize_text(text: str) -> str:
     text = text.replace('\r\n', '\n').replace('\r', '\n')
 
     return text
+def normalize_for_matching(text: str) -> str:
+    """Normalize text for matching - quotes, whitespace, punctuation."""
+    # One-liner version:
+    # return re.sub(r'\s+', ' ', re.sub(r'[\'"`''""‛„:;()\[\]\-–—]|[.,](?!(?<=\d[.,])\d)', ' ', re.sub(r'(?<=[^\W\d_])(?<![MmXx])(?=\d)|(?<=\d)(?=[^\W\d_])', ' ', text))).strip().lower()
+    
