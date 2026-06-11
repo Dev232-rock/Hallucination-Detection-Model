@@ -36,3 +36,6 @@ def normalize_for_matching(text: str) -> str:
     
         # Step 2: Remove quotes and punctuation (but preserve decimals)
         text = re.sub(r'[\'"`''""‛„:;()\[\]\-–—]|[.,](?!(?<=\d[.,])\d)', ' ', text)
+
+         # Step 3: Normalize whitespace and lowercase
+         text = re.sub(r'\s+', ' ', text).strip().lower()
