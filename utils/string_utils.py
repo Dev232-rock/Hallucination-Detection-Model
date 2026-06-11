@@ -33,11 +33,17 @@ def normalize_for_matching(text: str) -> str:
     # return re.sub(r'\s+', ' ', re.sub(r'[\'"`''""‛„:;()\[\]\-–—]|[.,](?!(?<=\d[.,])\d)', ' ', re.sub(r'(?<=[^\W\d_])(?<![MmXx])(?=\d)|(?<=\d)(?=[^\W\d_])', ' ', text))).strip().lower()
     text = re.sub(
         r'(?<=[^\W\d_])(?<![MmXx])(?=\d)|(?<=\d)(?=[^\W\d_])', ' ', text)
+
     
         # Step 2: Remove quotes and punctuation (but preserve decimals)
-        text = re.sub(r'[\'"`''""‛„:;()\[\]\-–—]|[.,](?!(?<=\d[.,])\d)', ' ', text)
+    text = re.sub(r'[\'"`''""‛„:;()\[\]\-–—]|[.,](?!(?<=\d[.,])\d)', ' ', text)
 
          # Step 3: Normalize whitespace and lowercase
-         text = re.sub(r'\s+', ' ', text).strip().lower()
+    text = re.sub(r'\s+', ' ', text).strip().lower()
     
-        return text
+    return text
+
+def trim_match_edges(query: str, match: str, normalize_text: bool = False) -> str:
+    #Trim unnecessary characters from the beginning and end of a match
+    if not match or match == query:
+       return match
