@@ -39,3 +39,5 @@ def normalize_for_matching(text: str) -> str:
 
          # Step 3: Normalize whitespace and lowercase
          text = re.sub(r'\s+', ' ', text).strip().lower()
+    
+        return text
