@@ -55,3 +55,6 @@ def trim_match_edges(query: str, match: str, normalize_text: bool = False) -> st
     best_match = match
     best_recall = initial_recall
 
+     # Try trimming from the beginning
+    for i in range(1, min(len(match) // 2, 20)):  # Don't trim more than half or 20 chars
+        trimmed = match[i:]
