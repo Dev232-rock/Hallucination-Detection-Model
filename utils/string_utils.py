@@ -47,3 +47,7 @@ def trim_match_edges(query: str, match: str, normalize_text: bool = False) -> st
     #Trim unnecessary characters from the beginning and end of a match
     if not match or match == query:
        return match
+    # Get initial recall score
+    if normalize_text:
+        initial_recall = ROUGE_SCORER.score(normalize_for_matching(query), normalize_for_matching(match))['rougeL'].recall
+        
