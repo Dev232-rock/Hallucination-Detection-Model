@@ -58,3 +58,6 @@ def trim_match_edges(query: str, match: str, normalize_text: bool = False) -> st
      # Try trimming from the beginning
     for i in range(1, min(len(match) // 2, 20)):  # Don't trim more than half or 20 chars
         trimmed = match[i:]
+
+    if normalize_text:
+            scores = ROUGE_SCORER.score(normalize_for_matching(query), normalize_for_matching(trimmed))
