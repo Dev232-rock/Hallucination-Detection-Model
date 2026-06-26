@@ -88,4 +88,6 @@ def trim_match_edges(query: str, match: str, normalize_text: bool = False) -> st
     match = best_match  # Start with best so far
     for i in range(1, min(len(match) // 2, 20)):
           trimmed = match[:-i]
+          if normalize_text:
+            scores = ROUGE_SCORER.score(normalize_for_matching(query), normalize_for_matching(trimmed))
         
