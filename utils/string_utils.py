@@ -95,3 +95,5 @@ def trim_match_edges(query: str, match: str, normalize_text: bool = False) -> st
           if scores['rougeL'].recall >= best_recall:
             best_match = trimmed
             best_recall = scores['rougeL'].recall
+          else:
+            break  # Stop if recall drops
