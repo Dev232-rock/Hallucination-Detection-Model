@@ -111,3 +111,7 @@ def trim_match_edges(query: str, match: str, normalize_text: bool = False) -> st
         else:
             break  # Stop if recall drops
     return best_match
+def find_closest_match(query: str, text: str, window_margin: int = 10, min_similarity: float = 0.9, normalize_text: bool = False) -> Optional[str]:
+    '''Finds the substring of `text` that best matches `query` using ROUGE-L similarity.'''
+    if query in text:
+        return query
