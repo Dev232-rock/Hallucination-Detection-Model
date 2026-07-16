@@ -121,3 +121,6 @@ def find_closest_match(query: str, text: str, window_margin: int = 10, min_simil
      # Precompute the best match info
     best_substring = ""
     best_score = -math.inf
+
+    if normalize_text:
+        query = normalize_for_matching(query)
