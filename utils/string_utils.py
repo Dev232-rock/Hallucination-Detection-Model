@@ -115,3 +115,6 @@ def find_closest_match(query: str, text: str, window_margin: int = 10, min_simil
     '''Finds the substring of `text` that best matches `query` using ROUGE-L similarity.'''
     if query in text:
         return query
+
+    # We'll attempt to match substrings in `text` that are around len(query).
+    query_len = len(query)
