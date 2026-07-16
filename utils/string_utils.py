@@ -118,3 +118,6 @@ def find_closest_match(query: str, text: str, window_margin: int = 10, min_simil
 
     # We'll attempt to match substrings in `text` that are around len(query).
     query_len = len(query)
+     # Precompute the best match info
+    best_substring = ""
+    best_score = -math.inf
