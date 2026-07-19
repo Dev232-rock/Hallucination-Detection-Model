@@ -138,5 +138,10 @@ def find_closest_match(query: str, text: str, window_margin: int = 10, min_simil
 
              if end_idx > len(text):
                 break  # no need to go further if we exceed text length
+            candidate_substring = text[start_idx:end_idx].strip()
+            if normalize_text:
+                normalized_candidate_substring = normalize_for_matching(candidate_substring)
+                scores = ROUGE_SCORER.score(query, normalized_candidate_substring)
+
 
 
