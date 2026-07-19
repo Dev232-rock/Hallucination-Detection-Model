@@ -136,3 +136,7 @@ def find_closest_match(query: str, text: str, window_margin: int = 10, min_simil
         for length in range(min_len, max_len + 1):
             end_idx = start_idx + length
 
+             if end_idx > len(text):
+                break  # no need to go further if we exceed text length
+
+
