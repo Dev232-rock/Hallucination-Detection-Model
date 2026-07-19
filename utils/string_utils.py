@@ -132,4 +132,7 @@ def find_closest_match(query: str, text: str, window_margin: int = 10, min_simil
 
     # Slide over the text and compare substrings
     for start_idx in range(len(text)):
+         # We'll try multiple substring lengths in [min_len, max_len]
+        for length in range(min_len, max_len + 1):
+            end_idx = start_idx + length
 
