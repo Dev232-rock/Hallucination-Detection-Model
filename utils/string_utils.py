@@ -124,3 +124,9 @@ def find_closest_match(query: str, text: str, window_margin: int = 10, min_simil
 
     if normalize_text:
         query = normalize_for_matching(query)
+
+     # Because we want to allow some variation (extra words, punctuation, etc.),
+    # we use a window size = query_len +/- window_margin
+    min_len = max(1, query_len - window_margin)
+    max_len = min(len(text), query_len + window_margin)
+
