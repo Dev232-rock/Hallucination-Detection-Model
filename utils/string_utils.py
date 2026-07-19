@@ -130,3 +130,6 @@ def find_closest_match(query: str, text: str, window_margin: int = 10, min_simil
     min_len = max(1, query_len - window_margin)
     max_len = min(len(text), query_len + window_margin)
 
+    # Slide over the text and compare substrings
+    for start_idx in range(len(text)):
+
