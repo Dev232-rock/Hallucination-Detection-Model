@@ -150,6 +150,13 @@ def find_closest_match(query: str, text: str, window_margin: int = 10, min_simil
                 best_score = rouge_l_score
                 best_substring = candidate_substring
 
+            if best_score > 0.95:
+                # Trim edges if not perfect
+                best_substring = trim_match_edges(query, best_substring, normalize_text)
+                assert best_substring in text, f"Best substring {best_substring} not in text {text}"
+                return best_substring
+
+
 
 
 
