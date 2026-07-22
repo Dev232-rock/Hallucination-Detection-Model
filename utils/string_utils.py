@@ -146,6 +146,11 @@ def find_closest_match(query: str, text: str, window_margin: int = 10, min_simil
                 scores = ROUGE_SCORER.score(query, candidate_substring)
             rouge_l_score = scores['rougeL'].fmeasure  # f-measure of ROUGE-L
 
+            if rouge_l_score > best_score:
+                best_score = rouge_l_score
+                best_substring = candidate_substring
+
+
 
 
 
