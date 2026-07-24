@@ -160,6 +160,11 @@ def find_closest_match(query: str, text: str, window_margin: int = 10, min_simil
               best_substring = trim_match_edges(query, best_substring, normalize_text)
               assert best_substring in text
               return best_substring
+        else:
+            if not normalize_text:
+                 return find_closest_match(query, text, window_margin, min_similarity, normalize_text=True)
+            return None
+
 
 
 
