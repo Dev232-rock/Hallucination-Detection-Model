@@ -164,6 +164,9 @@ def find_closest_match(query: str, text: str, window_margin: int = 10, min_simil
             if not normalize_text:
                  return find_closest_match(query, text, window_margin, min_similarity, normalize_text=True)
             return None
+def try_matching_span_in_text(span: str, text: str, cur_idx: int = 0, min_similarity: float = 0.8) -> Tuple[Optional[str], Optional[int]]:
+    # Try to match a span to a substring in the text.
+    closest_match: Optional[str] = find_closest_match(span, text[cur_idx:])
 
 
 
