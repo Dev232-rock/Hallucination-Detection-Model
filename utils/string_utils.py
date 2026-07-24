@@ -155,8 +155,11 @@ def find_closest_match(query: str, text: str, window_margin: int = 10, min_simil
                 best_substring = trim_match_edges(query, best_substring, normalize_text)
                 assert best_substring in text, f"Best substring {best_substring} not in text {text}"
                 return best_substring
-
-
+        if best_score >= min_similarity:
+             # Trim edges before returning  
+              best_substring = trim_match_edges(query, best_substring, normalize_text)
+              assert best_substring in text
+              return best_substring
 
 
 
