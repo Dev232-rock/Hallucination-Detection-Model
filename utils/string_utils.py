@@ -168,6 +168,9 @@ def try_matching_span_in_text(span: str, text: str, cur_idx: int = 0, min_simila
     # Try to match a span to a substring in the text.
     closest_match: Optional[str] = find_closest_match(span, text[cur_idx:])
 
+    if closest_match is not None:
+        span_idx = text[cur_idx:].index(closest_match)
+
 
 
 
