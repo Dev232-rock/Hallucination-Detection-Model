@@ -171,6 +171,9 @@ def try_matching_span_in_text(span: str, text: str, cur_idx: int = 0, min_simila
     if closest_match is not None:
         span_idx = text[cur_idx:].index(closest_match)
 
+        assert span_idx != -1, f"Span {repr(span)} not found in text[cur_idx:]: {repr(text[cur_idx:])}"
+        return closest_match, cur_idx + span_idx
+
 
 
 
