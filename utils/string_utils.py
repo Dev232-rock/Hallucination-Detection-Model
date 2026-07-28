@@ -174,6 +174,11 @@ def try_matching_span_in_text(span: str, text: str, cur_idx: int = 0, min_simila
         assert span_idx != -1, f"Span {repr(span)} not found in text[cur_idx:]: {repr(text[cur_idx:])}"
         return closest_match, cur_idx + span_idx
 
+    # try searching for the span in the previous part of the text
+    if cur_idx > 0:
+        return try_matching_span_in_text(span, text, cur_idx=0, min_similarity=min_similarity)
+
+    return None, None
 
 
 
