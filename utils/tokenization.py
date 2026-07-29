@@ -18,3 +18,8 @@ def find_string_in_tokens(target: str, tokens: Tensor, tokenizer: AutoTokenizer,
             end_idx_left = mid + 1
         n_iters -= 1
     end_idx = end_idx_left
+
+    # Binary search over the start index of the slice
+    n_iters = max_iters
+    start_idx_left, start_idx_right = 0, end_idx-1 
+    while start_idx_left != start_idx_right and n_iters > 0:
