@@ -23,3 +23,6 @@ def find_string_in_tokens(target: str, tokens: Tensor, tokenizer: AutoTokenizer,
     n_iters = max_iters
     start_idx_left, start_idx_right = 0, end_idx-1 
     while start_idx_left != start_idx_right and n_iters > 0:
+         mid = (start_idx_left + start_idx_right + 1) // 2
+        if target in tokenizer.decode(tokens[mid:end_idx]):
+            start_idx_left = mid
