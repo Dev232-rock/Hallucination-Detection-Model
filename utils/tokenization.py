@@ -36,6 +36,10 @@ def find_string_in_tokens(target: str, tokens: Tensor, tokenizer: AutoTokenizer,
      if target not in tokenizer.decode(tokens[target_slice]):
         raise ValueError(f"Failed to find {target} in tokens: {[tokenizer.decode([tok]) for tok in tokens]}")
     return target_slice
-
+def find_assistant_tokens_slice(
+    input_ids: Int[Tensor, "seq_len"], 
+    input_str: str, 
+    tokenizer: AutoTokenizer
+) -> slice:
     
     
