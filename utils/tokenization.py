@@ -41,5 +41,12 @@ def find_assistant_tokens_slice(
     input_str: str, 
     tokenizer: AutoTokenizer
 ) -> slice:
+     # Find the slice of tokens that marks the start of the assistant's response.
+     eot_tokens = [
+        '<|eot_id|><|start_header_id|>assistant<|end_header_id|>',  # llama 3.1 end-of-turn tokens
+        '<|im_start|>assistant',  # qwen end-of-turn tokens
+        '<start_of_turn>model',  # gemma end-of-turn tokens
+        "[/INST]",  # mistral end-of-turn tokens
+    ]
     
     
