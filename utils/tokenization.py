@@ -33,5 +33,8 @@ def find_string_in_tokens(target: str, tokens: Tensor, tokenizer: AutoTokenizer,
 
      target_slice = slice(start_idx, end_idx)
 
+     if target not in tokenizer.decode(tokens[target_slice]):
+        raise ValueError(f"Failed to find {target} in tokens: {[tokenizer.decode([tok]) for tok in tokens]}")
+
     
     
