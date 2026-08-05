@@ -28,3 +28,5 @@ def find_string_in_tokens(target: str, tokens: Tensor, tokenizer: AutoTokenizer,
             start_idx_left = mid
         else:
             start_idx_right = mid-1
+        n_iters -= 1
+    start_idx = start_idx_left
