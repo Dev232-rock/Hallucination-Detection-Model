@@ -54,3 +54,5 @@ def find_assistant_tokens_slice(
               return find_string_in_tokens(eot_token, input_ids, tokenizer)
           except (AssertionError, ValueError):
                 continue
+    print(f"Could not find assistant tokens in the input_ids: {input_str[:100]}...")
+    return slice(0, 0)
