@@ -47,6 +47,9 @@ def find_assistant_tokens_slice(
         '<|im_start|>assistant',  # qwen end-of-turn tokens
         '<start_of_turn>model',  # gemma end-of-turn tokens
         "[/INST]",  # mistral end-of-turn tokens
-    ]
-    
+    ] 
+    for eot_token in eot_tokens:
+     if eot_token in input_str:
+          try:
+              return find_string_in_tokens(eot_token, input_ids, tokenizer)
     
