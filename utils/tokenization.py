@@ -52,4 +52,5 @@ def find_assistant_tokens_slice(
      if eot_token in input_str:
           try:
               return find_string_in_tokens(eot_token, input_ids, tokenizer)
-    
+          except (AssertionError, ValueError):
+                continue
