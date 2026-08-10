@@ -66,3 +66,6 @@ def slice_to_list(slice_obj: slice, length: Optional[int] = None) -> List[int]:
             length = stop
          else:
             raise ValueError("Length must be provided if stop is None")
+
+    # Adjust start, stop, and step
+    start = 0 if start is None else start
