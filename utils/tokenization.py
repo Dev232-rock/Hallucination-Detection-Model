@@ -69,3 +69,4 @@ def slice_to_list(slice_obj: slice, length: Optional[int] = None) -> List[int]:
 
     # Adjust start, stop, and step
     start = 0 if start is None else start
+    stop = length if stop is None else stop
