@@ -59,3 +59,8 @@ def find_assistant_tokens_slice(
 def slice_to_list(slice_obj: slice, length: Optional[int] = None) -> List[int]:
     # Convert a slice object to a list of indices.
     start, stop, step = slice_obj.start, slice_obj.stop, slice_obj.step
+
+    # If length is not provided, use stop if it's not None, else raise an error
+    if length is None:
+        if stop is not None:
+            length = stop
