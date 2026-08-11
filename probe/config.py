@@ -12,3 +12,6 @@ from .dataset import TokenizedProbingDatasetConfig
 class ProbeConfig:
     # Configuration for a probe model.
     probe_id: str = "llama3_1_8b_lora_lambda_kl=0.5"
+
+    model_name: str = "meta-llama/Meta-Llama-3.1-8B-Instruct"
+    layer: Optional[int] = None  # Which layer to attach the probe to
