@@ -23,3 +23,5 @@ class ProbeConfig:
 
     # Loading configuration
     load_from: Optional[Literal['disk', 'hf']] = None  # "disk", "hf", or None
+    probe_path: Optional[Path] = None  # Local path for disk loading
+    hf_repo_id: Optional[str] = "andyrdt/hallucination-probes"  # HuggingFace repository ID
