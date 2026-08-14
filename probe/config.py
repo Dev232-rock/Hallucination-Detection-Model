@@ -17,3 +17,6 @@ class ProbeConfig:
     layer: Optional[int] = None  # Which layer to attach the probe to
      # LoRA configuration
     lora_layers: Optional[Union[List[int], str]] = "all"  # Which layers to apply LoRA to
+    lora_r: int = 16  # LoRA rank
+    lora_alpha: int = 32  # LoRA alpha scaling
+    lora_dropout: float = 0.05  # LoRA dropout
