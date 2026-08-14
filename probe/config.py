@@ -20,3 +20,6 @@ class ProbeConfig:
     lora_r: int = 16  # LoRA rank
     lora_alpha: int = 32  # LoRA alpha scaling
     lora_dropout: float = 0.05  # LoRA dropout
+
+    # Loading configuration
+    load_from: Optional[Literal['disk', 'hf']] = None  # "disk", "hf", or None
