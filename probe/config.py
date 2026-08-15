@@ -40,3 +40,9 @@ class ProbeConfig:
         if self.layer is None:
             # default to hooking the value head at the last layer of the underlying LM
             self.layer = get_num_layers(self.model_name) - 1
+
+        if isinstance(self.lora_layers, str):
+            if self.lora_layers == 'all':
+                # default to training LoRA adaptors on all layers
+                # (up to the layer where we hook the value head)
+                self.lora_layers = list(range(0, self.layer + 1))
