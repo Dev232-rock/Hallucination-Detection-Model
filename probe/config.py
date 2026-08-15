@@ -33,3 +33,5 @@ class ProbeConfig:
 
         if self.load_from == "hf" and not self.hf_repo_id:
             raise ValueError("hf_repo_id must be specified when load_from='hf'")
+        if self.load_from in ['disk'] and not self.probe_path.exists():
+            raise ValueError(f"Probe with ID {self.probe_id} not found in disk at path {self.probe_path}")
