@@ -30,3 +30,6 @@ class ProbeConfig:
     def __post_init__(self):
         # Validate configuration.
         self.probe_path = LOCAL_PROBES_DIR / self.probe_id
+
+        if self.load_from == "hf" and not self.hf_repo_id:
+            raise ValueError("hf_repo_id must be specified when load_from='hf'")
