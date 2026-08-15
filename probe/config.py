@@ -26,3 +26,7 @@ class ProbeConfig:
     probe_path: Optional[Path] = None  # Local path for disk loading
     hf_repo_id: Optional[str] = "andyrdt/hallucination-probes"  # HuggingFace repository ID
     threshold: float = 0.5  # Classification threshold
+
+    def __post_init__(self):
+        # Validate configuration.
+        self.probe_path = LOCAL_PROBES_DIR / self.probe_id
