@@ -48,3 +48,5 @@ class ProbeConfig:
                 self.lora_layers = list(range(0, self.layer + 1))
             elif self.lora_layers.lower() == 'none':
                 self.lora_layers = []
+            else:
+                self.lora_layers = [int(layer) for layer in self.lora_layers.strip('[').strip(']').split(",")]
