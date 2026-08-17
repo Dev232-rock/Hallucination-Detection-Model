@@ -46,3 +46,5 @@ class ProbeConfig:
                 # default to training LoRA adaptors on all layers
                 # (up to the layer where we hook the value head)
                 self.lora_layers = list(range(0, self.layer + 1))
+            elif self.lora_layers.lower() == 'none':
+                self.lora_layers = []
