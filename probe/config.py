@@ -50,3 +50,4 @@ class ProbeConfig:
                 self.lora_layers = []
             else:
                 self.lora_layers = [int(layer) for layer in self.lora_layers.strip('[').strip(']').split(",")]
+                assert len(self.lora_layers) > 0
