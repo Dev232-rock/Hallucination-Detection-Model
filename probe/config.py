@@ -52,3 +52,4 @@ class ProbeConfig:
                 self.lora_layers = [int(layer) for layer in self.lora_layers.strip('[').strip(']').split(",")]
         elif self.lora_layers is None:
             self.lora_layers = []
+        assert all(isinstance(l, int) for l in self.lora_layers)
