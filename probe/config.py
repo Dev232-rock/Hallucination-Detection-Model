@@ -53,3 +53,7 @@ class ProbeConfig:
         elif self.lora_layers is None:
             self.lora_layers = []
         assert all(isinstance(l, int) for l in self.lora_layers)
+@dataclass
+class TrainingConfig:
+    #Configuration for probe training.  
+    wandb_project: str = "hallucination-probes"
