@@ -59,3 +59,8 @@ class TrainingConfig:
     wandb_project: str = "hallucination-probes"
     wandb_name: Optional[str] = None
     probe_config: ProbeConfig = field(default_factory=ProbeConfig)
+
+    upload_to_hf: bool = False
+    save_evaluation_metrics: bool = True
+    save_roc_curves: bool = False
+    dump_raw_eval_results: bool = False
