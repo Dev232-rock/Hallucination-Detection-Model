@@ -57,3 +57,4 @@ class ProbeConfig:
 class TrainingConfig:
     #Configuration for probe training.  
     wandb_project: str = "hallucination-probes"
+    wandb_name: Optional[str] = None
