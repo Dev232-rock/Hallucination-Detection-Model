@@ -70,3 +70,7 @@ class TrainingConfig:
     per_device_train_batch_size: int = 4
     per_device_eval_batch_size: int = 4
     high_loss_threshold: Optional[float] = None  # Threshold for masking high-loss tokens
+    lambda_lm: float = 0.0  # Weight for language modeling loss regularization
+    lambda_kl: float = 0.0  # Weight for KL divergence regularization
+    anneal_max_aggr: bool = True  # Whether to anneal span-level max aggregation loss
+    anneal_warmup: float = 1.0  # Fraction of training for span loss warmup
