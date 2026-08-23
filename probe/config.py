@@ -74,3 +74,8 @@ class TrainingConfig:
     lambda_kl: float = 0.0  # Weight for KL divergence regularization
     anneal_max_aggr: bool = True  # Whether to anneal span-level max aggregation loss
     anneal_warmup: float = 1.0  # Fraction of training for span loss warmup
+    learning_rate: float = 5e-5  # Overall learning rate (deprecated)
+    probe_head_lr: Optional[float] = 5e-3 # Separate LR for probe head
+    lora_lr: Optional[float] = 5e-5  # Separate LR for LoRA parameters
+    sparsity_penalty_weight: Optional[float] = None
+    num_train_samples: Optional[int] = None  # Limit training samples
