@@ -64,3 +64,9 @@ class TrainingConfig:
     save_evaluation_metrics: bool = True
     save_roc_curves: bool = False
     dump_raw_eval_results: bool = False
+
+
+       # Training hyperparameters
+    per_device_train_batch_size: int = 4
+    per_device_eval_batch_size: int = 4
+    high_loss_threshold: Optional[float] = None  # Threshold for masking high-loss tokens
