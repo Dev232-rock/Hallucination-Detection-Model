@@ -82,3 +82,6 @@ class TrainingConfig:
     max_steps: int = -1  # Override num_epochs if set
     num_train_epochs: int = 1
     enable_gradient_checkpointing: bool = True
+     gradient_accumulation_steps: int = 1
+    max_grad_norm: float = 1.0
+    eval_steps: Optional[int] = -1  # Only manually evaluate at the end
