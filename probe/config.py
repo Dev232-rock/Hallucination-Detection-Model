@@ -79,3 +79,6 @@ class TrainingConfig:
     lora_lr: Optional[float] = 5e-5  # Separate LR for LoRA parameters
     sparsity_penalty_weight: Optional[float] = None
     num_train_samples: Optional[int] = None  # Limit training samples
+    max_steps: int = -1  # Override num_epochs if set
+    num_train_epochs: int = 1
+    enable_gradient_checkpointing: bool = True
