@@ -88,3 +88,7 @@ class TrainingConfig:
     evaluation_strategy: str = "no"  # "steps", "epoch", or "no"
     logging_steps: int = 10
     seed: int = 42
+
+     # Dataset configuration
+    train_datasets: List[dict] = field(default_factory=list)
+    eval_datasets: List[dict] = field(default_factory=list)
