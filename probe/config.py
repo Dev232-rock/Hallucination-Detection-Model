@@ -92,3 +92,8 @@ class TrainingConfig:
      # Dataset configuration
     train_datasets: List[dict] = field(default_factory=list)
     eval_datasets: List[dict] = field(default_factory=list)
+
+    # These will be populated in __post_init__
+    train_dataset_configs: List[TokenizedProbingDatasetConfig] = field(default_factory=list, init=False)
+    eval_dataset_configs: List[TokenizedProbingDatasetConfig] = field(default_factory=list, init=False)
+    
