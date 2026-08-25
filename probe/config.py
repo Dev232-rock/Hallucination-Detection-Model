@@ -121,3 +121,9 @@ class TrainingConfig:
             TokenizedProbingDatasetConfig(**config)
             for config in self.eval_datasets
         ]
+         # Convert scientific notation strings to floats
+        # otherwise yaml parses e.g. '1e-6' as a string instead of a float
+        float_fields = [
+            'learning_rate', 'probe_head_lr', 'lora_lr', 'max_grad_norm', 
+            'anneal_warmup', 'lambda_lm', 'lambda_kl', 'sparsity_penalty_weight'
+        ]
