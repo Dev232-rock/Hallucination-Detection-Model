@@ -105,3 +105,9 @@ class TrainingConfig:
           # Handle special values
         if self.eval_steps == -1:
             self.eval_steps = None
+
+        # Handle learning rates
+        if self.probe_head_lr is None:
+            self.probe_head_lr = self.learning_rate
+        if self.lora_lr is None:
+            self.lora_lr = self.learning_rate
