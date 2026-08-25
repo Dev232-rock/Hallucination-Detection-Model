@@ -117,3 +117,7 @@ class TrainingConfig:
             TokenizedProbingDatasetConfig(**config)
             for config in self.train_datasets
         ]
+        self.eval_dataset_configs = [
+            TokenizedProbingDatasetConfig(**config)
+            for config in self.eval_datasets
+        ]
