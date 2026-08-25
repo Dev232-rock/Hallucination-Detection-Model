@@ -111,3 +111,9 @@ class TrainingConfig:
             self.probe_head_lr = self.learning_rate
         if self.lora_lr is None:
             self.lora_lr = self.learning_rate
+
+        # Parse dataset configurations
+        self.train_dataset_configs = [
+            TokenizedProbingDatasetConfig(**config)
+            for config in self.train_datasets
+        ]
