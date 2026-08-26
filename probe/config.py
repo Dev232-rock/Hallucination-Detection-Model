@@ -138,3 +138,5 @@ class EvaluationConfig:
     probe_config: ProbeConfig = field(default_factory=ProbeConfig)
     datasets: List[dict] = field(default_factory=list)
     per_device_eval_batch_size: int = 8
+    output_dir: Optional[Path] = None
+    save_predictions: bool = True
