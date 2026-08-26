@@ -142,3 +142,6 @@ class EvaluationConfig:
     save_predictions: bool = True
     save_roc_curves: bool = True
     save_raw_results: bool = False  # Save all predictions and labels
+    # This will be populated in __post_init__
+    dataset_configs: List[TokenizedProbingDatasetConfig] = field(default_factory=list, init=False)
+    
