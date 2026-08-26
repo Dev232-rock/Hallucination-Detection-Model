@@ -127,3 +127,7 @@ class TrainingConfig:
             'learning_rate', 'probe_head_lr', 'lora_lr', 'max_grad_norm', 
             'anneal_warmup', 'lambda_lm', 'lambda_kl', 'sparsity_penalty_weight'
         ]
+        for field_name in float_fields:
+            value = getattr(self, field_name)
+            if value is not None and isinstance(value, str):
+                setattr(self, field_name, float(value))
