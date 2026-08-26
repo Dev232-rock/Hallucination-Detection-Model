@@ -140,3 +140,5 @@ class EvaluationConfig:
     per_device_eval_batch_size: int = 8
     output_dir: Optional[Path] = None
     save_predictions: bool = True
+    save_roc_curves: bool = True
+    save_raw_results: bool = False  # Save all predictions and labels
