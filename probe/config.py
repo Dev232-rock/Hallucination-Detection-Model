@@ -131,3 +131,8 @@ class TrainingConfig:
             value = getattr(self, field_name)
             if value is not None and isinstance(value, str):
                 setattr(self, field_name, float(value))
+
+@dataclass
+class EvaluationConfig:
+    # Configuration for probe evaluation.
+    probe_config: ProbeConfig = field(default_factory=ProbeConfig)
