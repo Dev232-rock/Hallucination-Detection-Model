@@ -145,3 +145,7 @@ class EvaluationConfig:
     # This will be populated in __post_init__
     dataset_configs: List[TokenizedProbingDatasetConfig] = field(default_factory=list, init=False)
     eval_dataset_configs: List[TokenizedProbingDatasetConfig] = field(default_factory=list, init=False)
+    def __post_init__(self):
+        # Post-initialization processing.
+        if isinstance(self.probe_config, dict):
+            self.probe_config = ProbeConfig(**self.probe_config)
