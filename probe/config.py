@@ -144,4 +144,4 @@ class EvaluationConfig:
     save_raw_results: bool = False  # Save all predictions and labels
     # This will be populated in __post_init__
     dataset_configs: List[TokenizedProbingDatasetConfig] = field(default_factory=list, init=False)
-    
+    eval_dataset_configs: List[TokenizedProbingDatasetConfig] = field(default_factory=list, init=False)
