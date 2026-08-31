@@ -151,4 +151,5 @@ class EvaluationConfig:
             self.probe_config = ProbeConfig(**self.probe_config)
         self.dataset_configs = [
             TokenizedProbingDatasetConfig(**dataset_config)
-        
+         for dataset_config in self.datasets
+        ]
