@@ -149,7 +149,6 @@ class EvaluationConfig:
         # Post-initialization processing.
         if isinstance(self.probe_config, dict):
             self.probe_config = ProbeConfig(**self.probe_config)
-         # Handle special values
-        if self.eval_steps == -1:
-            self.eval_steps = None
+        self.dataset_configs = [
+            TokenizedProbingDatasetConfig(**dataset_config)
         
