@@ -153,3 +153,5 @@ class EvaluationConfig:
             TokenizedProbingDatasetConfig(**dataset_config)
          for dataset_config in self.datasets
         ]
+        if self.output_dir is None:
+            self.output_dir = self.probe_config.probe_path / "evaluation_results"
