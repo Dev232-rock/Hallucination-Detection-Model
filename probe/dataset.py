@@ -22,3 +22,6 @@ class TokenizedProbingDatasetConfig:
     dataset_id: str
     hf_repo: str
     subset: Optional[str] = None
+    split: str = "train"
+    max_length: int = 2048
+    ignore_buffer: int = 0  # Buffer around spans to ignore
