@@ -18,4 +18,7 @@ from .types import AnnotatedSpan, ProbingItem
 from .dataset_converters import get_prepare_function
 @dataclass
 class TokenizedProbingDatasetConfig:
-    # Configuration for tokenizing and labeling a probing dataset at token level
+    # Configuration for tokenizing and labeling a probing dataset at token level\
+    dataset_id: str
+    hf_repo: str
+    subset: Optional[str] = None
