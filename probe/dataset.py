@@ -19,9 +19,10 @@ from .dataset_converters import get_prepare_function
 @dataclass
 class TokenizedProbingDatasetConfig:
     # Configuration for tokenizing and labeling a probing dataset at token level\
-    dataset_id: str
+    dataset_id: str             
     hf_repo: str
     subset: Optional[str] = None
     split: str = "train"
     max_length: int = 2048
     ignore_buffer: int = 0  # Buffer around spans to ignore
+                                                                                                                                       
