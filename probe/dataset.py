@@ -25,7 +25,7 @@ class TokenizedProbingDatasetConfig:
     split: str = "train"
     max_length: int = 2048
     ignore_buffer: int = 0  # Buffer around spans to ignore
-     default_ignore: bool = False  # If true, ignore tokens not in any span
+    default_ignore: bool = False  # If true, ignore tokens not in any span
     last_span_token: bool = False  # If true, only label the last token of each span
     pos_weight: float = 1.0  # Weight for positive (hallucination) tokens
     neg_weight: float = 1.0  # Weight for negative (supported) tokens
