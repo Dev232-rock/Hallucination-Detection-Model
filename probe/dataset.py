@@ -34,4 +34,10 @@ class TokenizedProbingDatasetConfig:
     process_on_the_fly: bool = False
     max_num_samples: Optional[int] = None
 class TokenizedProbingDataset(Dataset):
-    #Dataset for probing model activations with annotated spans.                                                                                                                     
+    #Dataset for probing model activations with annotated spans.    
+     def __init__(
+        self,
+        items: List[ProbingItem],
+        config: TokenizedProbingDatasetConfig,
+        tokenizer: AutoTokenizer,
+    ):                                                                                                                 
