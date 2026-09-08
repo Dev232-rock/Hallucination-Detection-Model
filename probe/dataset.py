@@ -32,4 +32,5 @@ class TokenizedProbingDatasetConfig:
     shuffle: bool = True
     seed: int = 42
     process_on_the_fly: bool = False
+    max_num_samples: Optional[int] = None
                                                                                                                                        
