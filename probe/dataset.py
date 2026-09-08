@@ -33,4 +33,5 @@ class TokenizedProbingDatasetConfig:
     seed: int = 42
     process_on_the_fly: bool = False
     max_num_samples: Optional[int] = None
-                                                                                                                                       
+class TokenizedProbingDataset(Dataset):
+    #Dataset for probing model activations with annotated spans.                                                                                                                     
