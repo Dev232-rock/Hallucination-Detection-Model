@@ -29,4 +29,7 @@ class TokenizedProbingDatasetConfig:
     last_span_token: bool = False  # If true, only label the last token of each span
     pos_weight: float = 1.0  # Weight for positive (hallucination) tokens
     neg_weight: float = 1.0  # Weight for negative (supported) tokens
+    shuffle: bool = True
+    seed: int = 42
+    process_on_the_fly: bool = False
                                                                                                                                        
