@@ -47,4 +47,7 @@ class TokenizedProbingDataset(Dataset):
         self.processed_items = [None] * len(items)
         self.debug_mode = False
         self.print_first_example = False
+
+        self._num_skipped_spans: int = 0
+        self._num_added_spans: int = 0
                                                                                                                    
