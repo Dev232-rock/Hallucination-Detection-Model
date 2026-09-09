@@ -50,4 +50,7 @@ class TokenizedProbingDataset(Dataset):
 
         self._num_skipped_spans: int = 0
         self._num_added_spans: int = 0
+
+        if self.config.shuffle:
+            self._shuffle_items()
                                                                                                                    
