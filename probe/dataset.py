@@ -40,4 +40,11 @@ class TokenizedProbingDataset(Dataset):
         items: List[ProbingItem],
         config: TokenizedProbingDatasetConfig,
         tokenizer: AutoTokenizer,
-    ):                                                                                                                 
+    ):      
+    self.config = config
+        self.tokenizer = tokenizer
+        self.items = deepcopy(items)
+        self.processed_items = [None] * len(items)
+        self.debug_mode = False
+        self.print_first_example = False
+                                                                                                                   
