@@ -59,4 +59,11 @@ class TokenizedProbingDataset(Dataset):
             self.processed_items = self.processed_items[:self.config.max_num_samples]
         if not self.config.process_on_the_fly:
             self._process_items()
+    def _process_items(self):
+        #Pre-process all items in the dataset.
+        for i, item in tqdm(enumerate(self.items), desc=f"Processing items ({self.config.dataset_id})", total=len(self.items)):
+             if i == 0 and self.print_first_example:
+                self.debug_mode = True
+            else:
+                self.debug_mode = False
                                                                                                                    
