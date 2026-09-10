@@ -57,4 +57,6 @@ class TokenizedProbingDataset(Dataset):
         if self.config.max_num_samples:
             self.items = self.items[:self.config.max_num_samples]
             self.processed_items = self.processed_items[:self.config.max_num_samples]
+        if not self.config.process_on_the_fly:
+            self._process_items()
                                                                                                                    
