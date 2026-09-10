@@ -53,4 +53,8 @@ class TokenizedProbingDataset(Dataset):
 
         if self.config.shuffle:
             self._shuffle_items()
+    # Limit samples if specified (do this after shuffling)
+        if self.config.max_num_samples:
+            self.items = self.items[:self.config.max_num_samples]
+            self.processed_items = self.processed_items[:self.config.max_num_samples]
                                                                                                                    
