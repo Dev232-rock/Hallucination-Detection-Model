@@ -80,4 +80,6 @@ class TokenizedProbingDataset(Dataset):
             {'role': 'assistant', 'content': item.completion}
         ]
         full_text = self.tokenizer.apply_chat_template(conversation, tokenize=False)
+         if self.tokenizer.bos_token and self.tokenizer.bos_token in full_text:
+            full_text = full_text.replace(self.tokenizer.bos_token, '')
                                                                                                                    
