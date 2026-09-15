@@ -79,4 +79,5 @@ class TokenizedProbingDataset(Dataset):
             {'role': 'user', 'content': item.prompt},
             {'role': 'assistant', 'content': item.completion}
         ]
+        full_text = self.tokenizer.apply_chat_template(conversation, tokenize=False)
                                                                                                                    
