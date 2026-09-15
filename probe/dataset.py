@@ -73,4 +73,10 @@ class TokenizedProbingDataset(Dataset):
         print(f"\t- Number of added spans: {self._num_added_spans}")
         print(f"\t- Number of skipped spans: {self._num_skipped_spans} / {self._num_added_spans + self._num_skipped_spans}")
         print(f"\t- Total number of items: {len(self.items)}")
+     def _process_item(self, item: ProbingItem) -> Dict:
+        #Process a single example into tokenized format with labels.
+        conversation = [
+            {'role': 'user', 'content': item.prompt},
+            {'role': 'assistant', 'content': item.completion}
+        ]
                                                                                                                    
