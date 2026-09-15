@@ -69,4 +69,8 @@ class TokenizedProbingDataset(Dataset):
                processed_item = self._process_item(item)
             if processed_item:
                 self.processed_items[i] = processed_item
+        print(f"Dataset {self.config.dataset_id} stats:")
+        print(f"\t- Number of added spans: {self._num_added_spans}")
+        print(f"\t- Number of skipped spans: {self._num_skipped_spans} / {self._num_added_spans + self._num_skipped_spans}")
+        print(f"\t- Total number of items: {len(self.items)}")
                                                                                                                    
