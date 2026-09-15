@@ -82,4 +82,12 @@ class TokenizedProbingDataset(Dataset):
         full_text = self.tokenizer.apply_chat_template(conversation, tokenize=False)
          if self.tokenizer.bos_token and self.tokenizer.bos_token in full_text:
             full_text = full_text.replace(self.tokenizer.bos_token, '')
+        encoding = self.tokenizer(
+            full_text,
+            truncation=True,
+            max_length=self.config.max_length,
+            padding='max_length',
+            return_tensors='pt',
+            padding_side='right'
+        )
                                                                                                                    
