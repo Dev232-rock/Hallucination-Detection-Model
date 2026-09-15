@@ -66,4 +66,7 @@ class TokenizedProbingDataset(Dataset):
                 self.debug_mode = True
             else:
                 self.debug_mode = False
+               processed_item = self._process_item(item)
+            if processed_item:
+                self.processed_items[i] = processed_item
                                                                                                                    
