@@ -97,4 +97,9 @@ class TokenizedProbingDataset(Dataset):
             input_ids=input_ids,
             item=item
         )
+
+        input_str: str = self.tokenizer.decode(input_ids)
+        assistant_tokens_slice = find_assistant_tokens_slice(input_ids, input_str, self.tokenizer)
+        completion_start_idx = assistant_tokens_slice.stop
+        
                                                                                                                    
