@@ -90,4 +90,6 @@ class TokenizedProbingDataset(Dataset):
             return_tensors='pt',
             padding_side='right'
         )
+        input_ids: Int[Tensor, "seq_len"] = encoding["input_ids"][0]
+        attention_mask: Int[Tensor, "seq_len"] = encoding["attention_mask"][0]
                                                                                                                    
