@@ -92,4 +92,9 @@ class TokenizedProbingDataset(Dataset):
         )
         input_ids: Int[Tensor, "seq_len"] = encoding["input_ids"][0]
         attention_mask: Int[Tensor, "seq_len"] = encoding["attention_mask"][0]
+
+        labels, weights, pos_spans, neg_spans = self._compute_positional_labels(
+            input_ids=input_ids,
+            item=item
+        )
                                                                                                                    
