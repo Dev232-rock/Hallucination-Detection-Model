@@ -115,5 +115,11 @@ class TokenizedProbingDataset(Dataset):
             "neg_spans": neg_spans,  # List[List[int]]
             "lm_labels": lm_labels,  # Int[Tensor, "seq_len"]
         }
-        
-                                                                                                                   
+        def print_token_labels(
+        self,
+        input_ids: torch.Tensor,
+        positive_indices: List[int],
+        negative_indices: List[int],
+        ignore_indices: List[int],
+        spans: List[AnnotatedSpan]
+    ):                                                                                                      
