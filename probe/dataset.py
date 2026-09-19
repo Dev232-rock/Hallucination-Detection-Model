@@ -105,5 +105,15 @@ class TokenizedProbingDataset(Dataset):
         lm_labels = input_ids.clone()
         lm_labels[:completion_start_idx] = -100  # ignore all tokens in the prompt
         lm_labels[attention_mask == 0] = -100  # ignore padding tokens
+
+        return {
+            "input_ids": input_ids,  # Int[Tensor, "seq_len"]
+            "attention_mask": attention_mask,  # Int[Tensor, "seq_len"]
+            "classification_labels": labels,  # Float[Tensor, "seq_len"]
+            "classification_weights": weights,  # Float[Tensor, "seq_len"]
+            "pos_spans": pos_spans,  # List[List[int]]
+            "neg_spans": neg_spans,  # List[List[int]]
+            "lm_labels": lm_labels,  # Int[Tensor, "seq_len"]
+        }
         
                                                                                                                    
