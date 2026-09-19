@@ -101,5 +101,9 @@ class TokenizedProbingDataset(Dataset):
         input_str: str = self.tokenizer.decode(input_ids)
         assistant_tokens_slice = find_assistant_tokens_slice(input_ids, input_str, self.tokenizer)
         completion_start_idx = assistant_tokens_slice.stop
+
+        lm_labels = input_ids.clone()
+        lm_labels[:completion_start_idx] = -100  # ignore all tokens in the prompt
+        lm_labels[attention_mask == 0] = -100  # ignore padding tokens
         
                                                                                                                    
