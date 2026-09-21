@@ -123,6 +123,6 @@ class TokenizedProbingDataset(Dataset):
         ignore_indices: List[int],
         spans: List[AnnotatedSpan]
     ):     
-    """Debug method to print how tokens have been labeled."""
+    #Debug method to print how tokens have been labeled.
 
         tokens = [self.tokenizer.decode(tok) for tok in input_ids]                                                                                                 
