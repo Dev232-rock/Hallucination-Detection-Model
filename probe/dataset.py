@@ -125,4 +125,10 @@ class TokenizedProbingDataset(Dataset):
     ):     
     #Debug method to print how tokens have been labeled.
 
-        tokens = [self.tokenizer.decode(tok) for tok in input_ids]                                                                                                 
+        tokens = [self.tokenizer.decode(tok) for tok in input_ids] 
+        print(f"================================================")
+        print(f"Number of spans: {len(spans)}")
+        print(f"Number of non-factual (hallucinated) spans: {len([f for f in spans if f.label == 1.0])}")
+        print(f"Number of N/A spans: {len([f for f in spans if f.label == -100])}")
+        print(f"Number of factual spans: {len([f for f in spans if f.label == 0.0])}")
+        print(f"Legend: red - positive, green - negative, blue - ignored")                                                                                                
