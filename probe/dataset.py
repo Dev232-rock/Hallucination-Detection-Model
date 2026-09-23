@@ -144,3 +144,4 @@ class TokenizedProbingDataset(Dataset):
                 print(colored(token, 'blue'), end='')
             else:
                 print(token, end='')
+    print(f"================================================")
