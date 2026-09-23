@@ -131,4 +131,9 @@ class TokenizedProbingDataset(Dataset):
         print(f"Number of non-factual (hallucinated) spans: {len([f for f in spans if f.label == 1.0])}")
         print(f"Number of N/A spans: {len([f for f in spans if f.label == -100])}")
         print(f"Number of factual spans: {len([f for f in spans if f.label == 0.0])}")
-        print(f"Legend: red - positive, green - negative, blue - ignored")                                                                                                
+        print(f"Legend: red - positive, green - negative, blue - ignored")     
+
+        for i, token in enumerate(tokens):
+            if token == self.tokenizer.eos_token:
+                continue
+
