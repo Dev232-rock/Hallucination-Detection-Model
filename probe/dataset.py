@@ -136,4 +136,11 @@ class TokenizedProbingDataset(Dataset):
         for i, token in enumerate(tokens):
             if token == self.tokenizer.eos_token:
                 continue
-
+             if i in positive_indices:
+                print(colored(token, 'red'), end='')
+            elif i in negative_indices:
+                print(colored(token, 'green'), end='')
+            elif i in ignore_indices:
+                print(colored(token, 'blue'), end='')
+            else:
+                print(token, end='')
