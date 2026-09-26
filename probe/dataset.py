@@ -172,3 +172,8 @@ class TokenizedProbingDataset(Dataset):
             input_str,
             self.tokenizer
         )
+        completion_start_idx = assistant_tokens_slice.stop
+        cur_idx = assistant_tokens_slice.stop
+        
+        # Sort spans by their index in the text
+        spans = sorted(item.spans, key=lambda x: x.index)
