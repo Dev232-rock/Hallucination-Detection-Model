@@ -145,3 +145,9 @@ class TokenizedProbingDataset(Dataset):
             else:
                 print(token, end='')
     print(f"================================================")
+
+    def _compute_positional_labels(
+        self,
+        input_ids: torch.Tensor,
+        item: ProbingItem
+    ) -> Tuple[torch.Tensor, torch.Tensor, List[List[int]], List[List[int]]]:
