@@ -158,3 +158,6 @@ class TokenizedProbingDataset(Dataset):
         positive_indices: List[int] = []    # indices of hallucinated spans
         negative_indices: List[int] = []    # indices of supported spans
         ignore_indices: List[int] = []      # indices to ignore in training
+
+        positive_spans: List[List[int]] = []
+        negative_spans: List[List[int]] = []
