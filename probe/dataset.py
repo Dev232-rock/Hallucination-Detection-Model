@@ -166,3 +166,9 @@ class TokenizedProbingDataset(Dataset):
             left_window = list(range(max(0, span_indices[0] - self.config.ignore_buffer), span_indices[0]))
             right_window = list(range(span_indices[-1] + 1, min(len(input_ids), span_indices[-1] + 1 + self.config.ignore_buffer)))
             return left_window + right_window
+         Find assistant tokens slice to know where to start looking for spans
+        assistant_tokens_slice = find_assistant_tokens_slice(
+            input_ids,
+            input_str,
+            self.tokenizer
+        )
