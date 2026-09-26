@@ -151,3 +151,10 @@ class TokenizedProbingDataset(Dataset):
         input_ids: torch.Tensor,
         item: ProbingItem
     ) -> Tuple[torch.Tensor, torch.Tensor, List[List[int]], List[List[int]]]:
+     # Computes positional labels for a sequence of tokens based on annotated spans.
+     input_str: str = self.tokenizer.decode(input_ids)
+        completion: str = item.completion
+        
+        positive_indices: List[int] = []    # indices of hallucinated spans
+        negative_indices: List[int] = []    # indices of supported spans
+        ignore_indices: List[int] = []      # indices to ignore in training
