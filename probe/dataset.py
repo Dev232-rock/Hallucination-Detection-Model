@@ -161,3 +161,8 @@ class TokenizedProbingDataset(Dataset):
 
         positive_spans: List[List[int]] = []
         negative_spans: List[List[int]] = []
+
+        def get_nearby_indices(span_indices: List[int]) -> List[int]:
+            left_window = list(range(max(0, span_indices[0] - self.config.ignore_buffer), span_indices[0]))
+            right_window = list(range(span_indices[-1] + 1, min(len(input_ids), span_indices[-1] + 1 + self.config.ignore_buffer)))
+            return left_window + right_window
