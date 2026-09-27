@@ -177,3 +177,8 @@ class TokenizedProbingDataset(Dataset):
         
         # Sort spans by their index in the text
         spans = sorted(item.spans, key=lambda x: x.index)
+
+         for span in spans:
+            if span.span not in input_str:
+                self._num_skipped_spans += 1
+                continue
