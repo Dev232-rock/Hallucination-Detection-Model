@@ -186,3 +186,8 @@ class TokenizedProbingDataset(Dataset):
                 # First try to find the span after the assistant tokens
                 positions_slice = find_string_in_tokens(span.span, input_ids[cur_idx:], self.tokenizer)
                 positions_slice = slice(positions_slice.start + cur_idx, positions_slice.stop + cur_idx)
+             except (AssertionError, ValueError):
+                try:
+                    # If not found, try the whole input_ids
+                    print(f"Repeating position_slice search on all tokens after failing to find span {repr(span.span)} in input_ids[cur_idx:]: {repr(self.tokenizer.decode(input_ids[cur_idx:]))[:50]}...")
+                    positions_slice = find_string_in_tokens(span.span, input_ids, self.tokenizer)
