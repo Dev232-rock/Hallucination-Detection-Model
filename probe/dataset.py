@@ -182,3 +182,7 @@ class TokenizedProbingDataset(Dataset):
             if span.span not in input_str:
                 self._num_skipped_spans += 1
                 continue
+            try:
+                # First try to find the span after the assistant tokens
+                positions_slice = find_string_in_tokens(span.span, input_ids[cur_idx:], self.tokenizer)
+                positions_slice = slice(positions_slice.start + cur_idx, positions_slice.stop + cur_idx)
