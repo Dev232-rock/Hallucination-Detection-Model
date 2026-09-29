@@ -195,3 +195,7 @@ class TokenizedProbingDataset(Dataset):
                     print(f"Span {repr(span.span)} not found in input_ids, skipping entity")
                     self._num_skipped_spans += 1
                     continue
+
+            if positions_slice is None:
+                continue
+            span_indices = slice_to_list(positions_slice, len(input_ids))
