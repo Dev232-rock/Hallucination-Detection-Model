@@ -199,3 +199,7 @@ class TokenizedProbingDataset(Dataset):
             if positions_slice is None:
                 continue
             span_indices = slice_to_list(positions_slice, len(input_ids))
+            if not span_indices:
+                continue
+            
+            cur_idx = positions_slice.start
