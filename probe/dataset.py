@@ -191,3 +191,7 @@ class TokenizedProbingDataset(Dataset):
                     # If not found, try the whole input_ids
                     print(f"Repeating position_slice search on all tokens after failing to find span {repr(span.span)} in input_ids[cur_idx:]: {repr(self.tokenizer.decode(input_ids[cur_idx:]))[:50]}...")
                     positions_slice = find_string_in_tokens(span.span, input_ids, self.tokenizer)
+                    except (AssertionError, ValueError) as e:
+                    print(f"Span {repr(span.span)} not found in input_ids, skipping entity")
+                    self._num_skipped_spans += 1
+                    continue
