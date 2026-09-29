@@ -203,3 +203,55 @@ class TokenizedProbingDataset(Dataset):
                 continue
             
             cur_idx = positions_slice.start
+            ignore_indices_span = get_nearby_indices(span_indices)
+            
+            if span.label == 1.0:  # hallucinated
+                # Check if span is in assistant response
+                if all(idx >= completion_start_idx for idx in span_indices):
+                    positive_indices.extend(span_indices)
+                    positive_spans.append(span_indices)
+                    ignore_indices.extend(ignore_indices_span)
+                    self._num_added_spans += 1
+                else:
+                    print(f"Skipping hallucinated span not in assistant response: {repr(span.span)}")
+                    self._num_skipped_spans += 1
+                continue
+            
+            if span.label == 0.0:  # factual
+                # Check if span is in prompt
+                if all(idx < completion_start_idx for idx in span_indices):
+                    negative_indices.extend(span_indices)
+                    negative_spans.append(span_indices)
+                    continue
+            
+            ignore_indices.extend(span_indices)
+            ignore_indices.extend(ignore_indices_span)
+            self._num_added_spans += 1
+        
+        # Debug printing for first example
+        if self.debug_mode:
+            print_token_labels(
+                input_ids=input_ids,
+                positive_indices=positive_indices,
+                negative_indices=negative_indices,
+                ignore_indices=ignore_indices,
+                spans=spans
+            )
+        
+        # Ensure labels and weights have same length as input_ids
+        labels = torch.zeros(len(input_ids))
+        weights = torch.zeros(len(input_ids))
+        
+        for idx in positive_indices:
+            labels[idx] = 1.0
+            weights[idx] = 1.0
+            
+        for idx in negative_indices:
+            labels[idx] = 0.0
+            weights[idx] = 1.0
+            
+        for idx in ignore_indices:
+            labels[idx] = -100.0
+            weights[idx] = 0.0
+        
+        return labels, weights, positive_spans, negative_spans
