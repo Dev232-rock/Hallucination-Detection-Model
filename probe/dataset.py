@@ -261,3 +261,5 @@ class TokenizedProbingDataset(Dataset):
         random.shuffle(self.items)
         random.seed(self.config.seed)
         random.shuffle(self.processed_items)
+def __len__(self):
+    return len(self.items)
