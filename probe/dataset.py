@@ -255,3 +255,9 @@ class TokenizedProbingDataset(Dataset):
             weights[idx] = 0.0
         
         return labels, weights, positive_spans, negative_spans
+ def _shuffle_items(self):
+    #Shuffle the items using the configured seed.
+        random.seed(self.config.seed)
+        random.shuffle(self.items)
+        random.seed(self.config.seed)
+        random.shuffle(self.processed_items)
