@@ -263,3 +263,7 @@ class TokenizedProbingDataset(Dataset):
         random.shuffle(self.processed_items)
 def __len__(self):
     return len(self.items)
+
+def __getitem__(self, idx):
+    if self.config.process_on_the_fly and self.processed_items[idx] is None:
+        self.processed_items[idx] = self._process_item(self.items[idx])
