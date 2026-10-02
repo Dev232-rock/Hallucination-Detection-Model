@@ -1,0 +1,22 @@
+"""Sample evaluation configuration.
+
+Run with:
+    python -m probe.evaluate --config configs/eval_llama3_8b.yaml
+"""
+
+probe_config:
+  probe_id: "llama3_1_8b_lora_lambda_kl=0.5"
+  model_name: "meta-llama/Meta-Llama-3.1-8B-Instruct"
+  load_from: "disk"   # or "hf" to download from HuggingFace Hub
+
+per_device_eval_batch_size: 8
+save_predictions: true
+save_roc_curves: true
+
+datasets:
+  - dataset_id: "ragtruth"
+    hf_repo: "wandb/RAGTruth"
+    split: "test"
+    max_length: 2048
+    shuffle: false
+    seed: 42

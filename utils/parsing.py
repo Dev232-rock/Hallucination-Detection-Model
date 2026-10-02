@@ -18,8 +18,8 @@ def parse_and_validate_json(
     
     # Remove markdown code fences (```json or ```)
     cleaned_response = re.sub(
-        r"```(?:json)?", "", 
-        cleaned_response, 
+        r"```(?:json)?", "",
+        llm_response,
         flags=re.IGNORECASE
     ).replace("```", "").strip()
 
@@ -52,20 +52,16 @@ def validate_dicts_to_pydantic(
     # Validate a list of dictionaries against a Pydantic model. 
      validated = []
 
-     for i, item_dict in enumerate(dicts):
+    for i, item_dict in enumerate(dicts):
         try:
             validated_item = model.model_validate(item_dict)
             validated.append(validated_item)
         except Exception as e:
             if skip_invalid:
-                # Silently skip invalid items
-                continueexcept Exception as e:
-            if skip_invalid:
-                # Silently skip invalid items
                 continue
             else:
                 raise ValueError(
                     f"Validation failed for item {i}: {e}"
                 ) from e
 
-     return validated
+    return validated

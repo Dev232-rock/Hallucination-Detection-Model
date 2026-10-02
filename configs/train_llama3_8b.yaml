@@ -1,0 +1,49 @@
+"""Sample training configuration for LLaMA-3.1-8B probe.
+
+Run with:
+    python -m probe.train --config configs/train_llama3_8b.yaml
+"""
+
+probe_config:
+  probe_id: "llama3_1_8b_lora_lambda_kl=0.5"
+  model_name: "meta-llama/Meta-Llama-3.1-8B-Instruct"
+  lora_layers: "all"
+  lora_r: 16
+  lora_alpha: 32
+  lora_dropout: 0.05
+
+wandb_project: "hallucination-probes"
+wandb_name: "llama3_8b_ragtruth"
+
+# Training hyperparameters
+per_device_train_batch_size: 4
+per_device_eval_batch_size: 4
+num_train_epochs: 1
+probe_head_lr: 5.0e-3
+lora_lr: 5.0e-5
+max_grad_norm: 1.0
+lambda_lm: 0.0
+gradient_accumulation_steps: 4
+logging_steps: 10
+enable_gradient_checkpointing: true
+seed: 42
+
+# Training dataset
+train_datasets:
+  - dataset_id: "ragtruth"
+    hf_repo: "wandb/RAGTruth"
+    split: "train"
+    max_length: 2048
+    pos_weight: 3.0    # upweight hallucinated spans (class imbalance)
+    neg_weight: 1.0
+    shuffle: true
+    seed: 42
+
+# Evaluation datasets
+eval_datasets:
+  - dataset_id: "ragtruth"
+    hf_repo: "wandb/RAGTruth"
+    split: "test"
+    max_length: 2048
+    shuffle: false
+    seed: 42

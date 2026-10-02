@@ -61,48 +61,8 @@ def download_probe_from_hf(
 
         print(f"Downloaded probe to {local_folder}")
 
-        def upload_probe_to_hf(
-                repo_id: str,
-                probe_id: Optional[str] = None,
-                local_folder: Optional[Union[str, Path]] = None,
-                hf_repo_subfolder_prefix: str = "",
-                token: Optional[str] = None,
-                private: bool = False,
-                commit_message: str = "Upload probe model"
-                ) -> str:
-    ''' Uploads a probe (LoRA adapters + value head) to HuggingFace Hub. '''
-    
-    # Validate inputs
-    validate_repo_id(repo_id)
 
-    if local_folder is None:
-        local_folder = LOCAL_PROBES_DIR / probe_id
-    elif isinstance(local_folder, str):
-        local_folder = Path(local_folder)
-
-    if not local_folder.exists():
-        raise ValueError(f"Probe directory {probe_dir} does not exist")
-
-    path_in_repo = os.path.join(hf_repo_subfolder_prefix, probe_id)
-
-    # Login if token is provided
-    if token:
-        login(token=token)
-    api = HfApi()
-    # Create repo if it doesn't exist
-    api.create_repo(
-        repo_id=repo_id,
-        exist_ok=True,
-        private=private,
-        token=token
-    )
-
-     # Copy to destination
-    shutil.copy(downloaded_file, local_file_path)
-
-    print(f"Downloaded probe to {local_folder}")
-
-    def upload_probe_to_hf(
+def upload_probe_to_hf(
     repo_id: str,
     probe_id: Optional[str] = None,
     local_folder: Optional[Union[str, Path]] = None,
@@ -119,7 +79,7 @@ def download_probe_from_hf(
     elif isinstance(local_folder, str):
         local_folder = Path(local_folder)
     if not local_folder.exists():
-        raise ValueError(f"Probe directory {probe_dir} does not exist")
+        raise ValueError(f"Probe directory {local_folder} does not exist")
     path_in_repo = os.path.join(hf_repo_subfolder_prefix, probe_id)
 
     # Login if token is provided
@@ -135,18 +95,19 @@ def download_probe_from_hf(
     )
 
     print(f"Uploading folder {local_folder} to {repo_id}...")
-     api.upload_folder(
+    api.upload_folder(
         folder_path=str(local_folder),
         repo_id=repo_id,
         repo_type="model",
         path_in_repo=path_in_repo,
-         commit_message=commit_message,
+        commit_message=commit_message,
         token=token,
     )
-      # Return the URL
-    url = f"https://huggingface.co/{repo_id}"  
-    if repo_subfolder:
-        url += f"/tree/main/{repo_subfolder}"
+
+    # Return the URL
+    url = f"https://huggingface.co/{repo_id}"
+    if hf_repo_subfolder_prefix:
+        url += f"/tree/main/{hf_repo_subfolder_prefix}"
 
     print(f"Successfully uploaded probe to {url}")
     return url

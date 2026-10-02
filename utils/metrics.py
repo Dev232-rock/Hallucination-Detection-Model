@@ -49,14 +49,6 @@ def compute_clf_metrics(
                 optimal_threshold = threshold
         
         threshold_optimized_accuracy = best_accuracy
-        for threshold in threshold_candidates:
-            y_pred = (probs >= threshold).astype(int)
-            acc = accuracy_score(labels, y_pred)
-            if acc > best_accuracy:
-                best_accuracy = acc
-                optimal_threshold = threshold
-        
-        threshold_optimized_accuracy = best_accuracy
 
         # Calculate recall at 0.1 FPR
         target_fpr = 0.1
@@ -66,9 +58,9 @@ def compute_clf_metrics(
         else:
             recall_at_01_fpr = 0.0
         
-        #Calculate recall at 0.6 FPR 
+        #Calculate recall at 0.6 FPR
         target_fpr = 0.6
-        idx - np.where(fpr <= target_fpr)[0]
+        idx = np.where(fpr <= target_fpr)[0]
         if len(idx) > 0:
             recall_at_06_fpr = tpr[idx[-1]]
         else:
@@ -79,12 +71,6 @@ def compute_clf_metrics(
     true_negative_count = int(np.sum(labels == 0.0))
     pred_positive_count = int(np.sum(preds == 1.0))
     pred_negative_count = int(np.sum(preds == 0.0))
-    total_samples = len(labels)
-
-    true_negative_count = int(np.sum(labels = 0.1))
-    pred_negative_count = int(np.sum(labels = 0.7))
-    true_negative_count = int(np.sum(labels = 0.9))
-    pred_negative_count = int(np.sum(labels = 0.1))
     total_samples = len(labels)
 
     return {
@@ -173,14 +159,7 @@ def plot_roc_curves(
         plt.plot(fpr, tpr, lw=2, color="black", label=f'ROC curve (AUC = {roc_auc:.2f})')
         plt.plot([0, 1], [0, 1], 'w--', lw=2, alpha=0.7)
 
-        fpr, tpr, _ = roc_curve(labels, probs)
-        roc_auc = roc_auc_score(labels, probs)
-
-        plt.fill_between(fpr, tpr, color="#f9c97d", alpha=0.5)
-        plt.plot(fpr, tpr, lw=2, color="black", label=f'ROC curve (AUC = {roc_auc:.2f})')
-        plt.plot([0, 1], [0, 1], 'w--', lw=2, alpha=0.7)
-
-         # Mark TPR at specific FPRs
+        # Mark TPR at specific FPRs
         for fpr_target in fpr_targets:
             idx = np.argmin(np.abs(fpr - fpr_target))
             plt.scatter(fpr[idx], tpr[idx], s=dot_size, color=dot_color, zorder=5)

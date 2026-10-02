@@ -10,7 +10,7 @@ from termcolor import colored
 from torch import Tensor
 from torch.utils.data import Dataset
 
-rom tqdm import tqdm
+from tqdm import tqdm
 from transformers import AutoTokenizer
 
 from utils.tokenization import find_assistant_tokens_slice, find_string_in_tokens, slice_to_list
@@ -40,8 +40,8 @@ class TokenizedProbingDataset(Dataset):
         items: List[ProbingItem],
         config: TokenizedProbingDatasetConfig,
         tokenizer: AutoTokenizer,
-    ):      
-    self.config = config
+    ):
+        self.config = config
         self.tokenizer = tokenizer
         self.items = deepcopy(items)
         self.processed_items = [None] * len(items)
@@ -53,34 +53,40 @@ class TokenizedProbingDataset(Dataset):
 
         if self.config.shuffle:
             self._shuffle_items()
-    # Limit samples if specified (do this after shuffling)
+
+        # Limit samples if specified (do this after shuffling)
         if self.config.max_num_samples:
             self.items = self.items[:self.config.max_num_samples]
             self.processed_items = self.processed_items[:self.config.max_num_samples]
+
         if not self.config.process_on_the_fly:
             self._process_items()
+
     def _process_items(self):
-        #Pre-process all items in the dataset.
+        """Pre-process all items in the dataset."""
         for i, item in tqdm(enumerate(self.items), desc=f"Processing items ({self.config.dataset_id})", total=len(self.items)):
-             if i == 0 and self.print_first_example:
+            if i == 0 and self.print_first_example:
                 self.debug_mode = True
             else:
                 self.debug_mode = False
-               processed_item = self._process_item(item)
+            processed_item = self._process_item(item)
             if processed_item:
                 self.processed_items[i] = processed_item
+
         print(f"Dataset {self.config.dataset_id} stats:")
         print(f"\t- Number of added spans: {self._num_added_spans}")
         print(f"\t- Number of skipped spans: {self._num_skipped_spans} / {self._num_added_spans + self._num_skipped_spans}")
         print(f"\t- Total number of items: {len(self.items)}")
-     def _process_item(self, item: ProbingItem) -> Dict:
+
+    def _process_item(self, item: ProbingItem) -> Dict:
         #Process a single example into tokenized format with labels.
         conversation = [
             {'role': 'user', 'content': item.prompt},
             {'role': 'assistant', 'content': item.completion}
         ]
         full_text = self.tokenizer.apply_chat_template(conversation, tokenize=False)
-         if self.tokenizer.bos_token and self.tokenizer.bos_token in full_text:
+
+        if self.tokenizer.bos_token and self.tokenizer.bos_token in full_text:
             full_text = full_text.replace(self.tokenizer.bos_token, '')
         encoding = self.tokenizer(
             full_text,
@@ -115,15 +121,16 @@ class TokenizedProbingDataset(Dataset):
             "neg_spans": neg_spans,  # List[List[int]]
             "lm_labels": lm_labels,  # Int[Tensor, "seq_len"]
         }
-        def print_token_labels(
+
+    def print_token_labels(
         self,
         input_ids: torch.Tensor,
         positive_indices: List[int],
         negative_indices: List[int],
         ignore_indices: List[int],
         spans: List[AnnotatedSpan]
-    ):     
-    #Debug method to print how tokens have been labeled.
+    ):
+        """Debug method to print how tokens have been labeled."""
 
         tokens = [self.tokenizer.decode(tok) for tok in input_ids] 
         print(f"================================================")
@@ -136,7 +143,7 @@ class TokenizedProbingDataset(Dataset):
         for i, token in enumerate(tokens):
             if token == self.tokenizer.eos_token:
                 continue
-             if i in positive_indices:
+            if i in positive_indices:
                 print(colored(token, 'red'), end='')
             elif i in negative_indices:
                 print(colored(token, 'green'), end='')
@@ -144,15 +151,15 @@ class TokenizedProbingDataset(Dataset):
                 print(colored(token, 'blue'), end='')
             else:
                 print(token, end='')
-    print(f"================================================")
+        print(f"================================================")
 
     def _compute_positional_labels(
         self,
         input_ids: torch.Tensor,
         item: ProbingItem
     ) -> Tuple[torch.Tensor, torch.Tensor, List[List[int]], List[List[int]]]:
-     # Computes positional labels for a sequence of tokens based on annotated spans.
-     input_str: str = self.tokenizer.decode(input_ids)
+        """Computes positional labels for a sequence of tokens based on annotated spans."""
+        input_str: str = self.tokenizer.decode(input_ids)
         completion: str = item.completion
         
         positive_indices: List[int] = []    # indices of hallucinated spans
@@ -166,7 +173,8 @@ class TokenizedProbingDataset(Dataset):
             left_window = list(range(max(0, span_indices[0] - self.config.ignore_buffer), span_indices[0]))
             right_window = list(range(span_indices[-1] + 1, min(len(input_ids), span_indices[-1] + 1 + self.config.ignore_buffer)))
             return left_window + right_window
-         Find assistant tokens slice to know where to start looking for spans
+
+        # Find assistant tokens slice to know where to start looking for spans
         assistant_tokens_slice = find_assistant_tokens_slice(
             input_ids,
             input_str,
@@ -174,11 +182,11 @@ class TokenizedProbingDataset(Dataset):
         )
         completion_start_idx = assistant_tokens_slice.stop
         cur_idx = assistant_tokens_slice.stop
-        
+
         # Sort spans by their index in the text
         spans = sorted(item.spans, key=lambda x: x.index)
 
-         for span in spans:
+        for span in spans:
             if span.span not in input_str:
                 self._num_skipped_spans += 1
                 continue
@@ -186,12 +194,12 @@ class TokenizedProbingDataset(Dataset):
                 # First try to find the span after the assistant tokens
                 positions_slice = find_string_in_tokens(span.span, input_ids[cur_idx:], self.tokenizer)
                 positions_slice = slice(positions_slice.start + cur_idx, positions_slice.stop + cur_idx)
-             except (AssertionError, ValueError):
+            except (AssertionError, ValueError):
                 try:
                     # If not found, try the whole input_ids
                     print(f"Repeating position_slice search on all tokens after failing to find span {repr(span.span)} in input_ids[cur_idx:]: {repr(self.tokenizer.decode(input_ids[cur_idx:]))[:50]}...")
                     positions_slice = find_string_in_tokens(span.span, input_ids, self.tokenizer)
-                    except (AssertionError, ValueError) as e:
+                except (AssertionError, ValueError) as e:
                     print(f"Span {repr(span.span)} not found in input_ids, skipping entity")
                     self._num_skipped_spans += 1
                     continue
@@ -230,7 +238,7 @@ class TokenizedProbingDataset(Dataset):
         
         # Debug printing for first example
         if self.debug_mode:
-            print_token_labels(
+            self.print_token_labels(
                 input_ids=input_ids,
                 positive_indices=positive_indices,
                 negative_indices=negative_indices,
@@ -244,31 +252,43 @@ class TokenizedProbingDataset(Dataset):
         
         for idx in positive_indices:
             labels[idx] = 1.0
-            weights[idx] = 1.0
-            
+            weights[idx] = self.config.pos_weight
+
         for idx in negative_indices:
             labels[idx] = 0.0
-            weights[idx] = 1.0
+            weights[idx] = self.config.neg_weight
             
         for idx in ignore_indices:
             labels[idx] = -100.0
             weights[idx] = 0.0
         
         return labels, weights, positive_spans, negative_spans
- def _shuffle_items(self):
-    #Shuffle the items using the configured seed.
+    def _shuffle_items(self):
+        """Shuffle the items using the configured seed."""
         random.seed(self.config.seed)
         random.shuffle(self.items)
         random.seed(self.config.seed)
         random.shuffle(self.processed_items)
-def __len__(self):
-    return len(self.items)
 
-def __getitem__(self, idx):
-    if self.config.process_on_the_fly and self.processed_items[idx] is None:
-        self.processed_items[idx] = self._process_item(self.items[idx])
-    return self.processed_items[idx]
+    def __len__(self):
+        return len(self.items)
 
- def __add__(self, other):
-    # Concatenate two TokenizedProbingDataset instances.
-    if not isinstance(other, TokenizedProbingDataset):
+    def __getitem__(self, idx):
+        if self.config.process_on_the_fly and self.processed_items[idx] is None:
+            self.processed_items[idx] = self._process_item(self.items[idx])
+        return self.processed_items[idx]
+
+    def __add__(self, other: "TokenizedProbingDataset") -> "TokenizedProbingDataset":
+        """Concatenate two TokenizedProbingDataset instances."""
+        if not isinstance(other, TokenizedProbingDataset):
+            raise TypeError(f"Cannot concatenate TokenizedProbingDataset with {type(other)}")
+        combined = TokenizedProbingDataset.__new__(TokenizedProbingDataset)
+        combined.config = self.config
+        combined.tokenizer = self.tokenizer
+        combined.items = self.items + other.items
+        combined.processed_items = self.processed_items + other.processed_items
+        combined.debug_mode = False
+        combined.print_first_example = False
+        combined._num_skipped_spans = self._num_skipped_spans + other._num_skipped_spans
+        combined._num_added_spans = self._num_added_spans + other._num_added_spans
+        return combined
