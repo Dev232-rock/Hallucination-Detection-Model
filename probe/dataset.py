@@ -267,3 +267,4 @@ def __len__(self):
 def __getitem__(self, idx):
     if self.config.process_on_the_fly and self.processed_items[idx] is None:
         self.processed_items[idx] = self._process_item(self.items[idx])
+    return self.processed_items[idx]
