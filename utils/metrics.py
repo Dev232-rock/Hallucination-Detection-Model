@@ -82,6 +82,7 @@ def compute_clf_metrics(
         "optimal_threshold": float(optimal_threshold),
         "threshold_optimized_accuracy": float(threshold_optimized_accuracy),
         "recall_at_0.1_fpr": float(recall_at_01_fpr),
+        "recall_at_0.6_fpr": float(recall_at_06_fpr),
         "true_positive_count": true_positive_count,
         "true_negative_count": true_negative_count,
         "pred_positive_count": pred_positive_count,
@@ -94,31 +95,117 @@ def compute_metrics(
     labels: np.ndarray,
     probabilities: Optional[np.ndarray] = None
 ) -> Dict[str, float]:
-    # Compute evaluation metrics.
+    """Compute evaluation metrics (thin wrapper around compute_clf_metrics)."""
     if probabilities is None:
         probabilities = predictions
-    
     return compute_clf_metrics(predictions, labels, probabilities)
+
+
 def compute_span_level_metrics(
-    predictions: List[float],
-    labels: List[float], 
-    spans: List[List[int]]
+    token_probs: np.ndarray,
+    pos_spans: List[List[int]],
+    neg_spans: List[List[int]],
+    threshold: float = 0.5,
+    aggregation: str = "max",
 ) -> Dict[str, float]:
-    # Aggregate predictions by taking max over each span
-    span_preds = []
-    for span_indices in spans:
-        if len(span_indices) == 2:
-            start, end = span_indices
-            span_pred = max(predictions[start:end+1])
-            span_preds.append(span_pred)
-    
-    span_preds = np.array(span_preds)
-    span_labels = np.array(labels[:len(span_preds)])
-    
-    # Convert to binary predictions
-    binary_preds = (span_preds > 0.5).astype(float)
-    
-    return compute_clf_metrics(binary_preds, span_labels, span_preds)
+    """Compute span-level hallucination detection metrics.
+
+    For each span (positive = hallucinated, negative = factual) we aggregate
+    the per-token probabilities within that span into a single score, then
+    compute standard binary classification metrics at the span level.
+
+    Args:
+        token_probs:  1-D array of per-token hallucination probabilities for
+                      the *entire* sequence (length == seq_len).
+        pos_spans:    List of positive (hallucinated) spans.  Each element is
+                      a list of **token indices** belonging to that span.
+        neg_spans:    List of negative (factual) spans.  Same format.
+        threshold:    Decision threshold applied to span scores.
+        aggregation:  How to pool token probs within a span — ``"max"`` or
+                      ``"mean"``.
+
+    Returns:
+        Dict with the same keys as :func:`compute_clf_metrics`, prefixed with
+        nothing (caller can add a prefix).  Returns an empty dict when there
+        are no spans with both classes.
+    """
+    if not pos_spans and not neg_spans:
+        return {}
+
+    agg_fn = np.max if aggregation == "max" else np.mean
+
+    span_probs: List[float] = []
+    span_labels: List[float] = []
+
+    for indices in pos_spans:
+        if not indices:
+            continue
+        valid = [i for i in indices if i < len(token_probs)]
+        if not valid:
+            continue
+        span_probs.append(float(agg_fn(token_probs[valid])))
+        span_labels.append(1.0)
+
+    for indices in neg_spans:
+        if not indices:
+            continue
+        valid = [i for i in indices if i < len(token_probs)]
+        if not valid:
+            continue
+        span_probs.append(float(agg_fn(token_probs[valid])))
+        span_labels.append(0.0)
+
+    if not span_labels:
+        return {}
+
+    probs_arr = np.array(span_probs)
+    labels_arr = np.array(span_labels)
+    preds_arr = (probs_arr >= threshold).astype(float)
+
+    # Need at least one positive and one negative to compute AUC
+    if len(np.unique(labels_arr)) < 2:
+        return {}
+
+    return compute_clf_metrics(preds=preds_arr, labels=labels_arr, probs=probs_arr)
+
+
+def evaluate_predictions(
+    token_probs: np.ndarray,
+    token_labels: np.ndarray,
+    pos_spans: List[List[int]],
+    neg_spans: List[List[int]],
+    threshold: float = 0.5,
+) -> Dict[str, Dict[str, float]]:
+    """Return token-level **and** span-level (mean & max) metrics in one call.
+
+    Returns a dict with three keys: ``"token"``, ``"span_mean"``,
+    ``"span_max"``, each mapping to a metrics dict from
+    :func:`compute_clf_metrics` / :func:`compute_span_level_metrics`.
+    """
+    valid_mask = token_labels != -100.0
+    results: Dict[str, Dict[str, float]] = {}
+
+    if valid_mask.any():
+        valid_probs = token_probs[valid_mask]
+        valid_labels = token_labels[valid_mask]
+        valid_preds = (valid_probs >= threshold).astype(float)
+        if len(np.unique(valid_labels)) >= 2:
+            results["token"] = compute_clf_metrics(
+                preds=valid_preds, labels=valid_labels, probs=valid_probs
+            )
+
+    for agg in ("max", "mean"):
+        span_metrics = compute_span_level_metrics(
+            token_probs=token_probs,
+            pos_spans=pos_spans,
+            neg_spans=neg_spans,
+            threshold=threshold,
+            aggregation=agg,
+        )
+        if span_metrics:
+            results[f"span_{agg}"] = span_metrics
+
+    return results
 
 def plot_roc_curves(
     all_preds: Dict[str, List[float]],
@@ -228,44 +315,52 @@ def print_eval_metrics(
     include_random_baseline: bool = True,
     seed: int = 42,
 ) -> None:
-    if metric_key_prefix:
-        print(f"\n===== Evaluation Metrics ({metric_key_prefix}) =====")
-    else:
-        print("\n===== Evaluation Metrics =====")
-    
+    """Pretty-print evaluation metrics produced by compute_clf_metrics or evaluate_predictions."""
+    header = f"Evaluation Metrics ({metric_key_prefix})" if metric_key_prefix else "Evaluation Metrics"
+    print(f"\n===== {header} =====")
+
     prefix = metric_key_prefix + "/" if metric_key_prefix else ""
 
-        # Print loss metrics if available
-    if f'{prefix}lm_loss' in metrics:
+    # Loss metrics
+    if f"{prefix}lm_loss" in metrics:
         print("\nLoss Metrics:")
-        print(f" - LM Loss:     {metrics.get(f'{prefix}lm_loss', 0):.4f}")
-        print(f" - Probe Loss:  {metrics.get(f'{prefix}probe_loss', 0):.4f}")
-        print(f" - Sparsity:    {metrics.get(f'{prefix}sparsity', 0):.4f}")\
-        
-# Print classification metrics for different aggregation levels
-    for agg_level in ['all', 'span', 'span_max']:
-        if f'{prefix}{agg_level}_accuracy' in metrics:
-            print(f"\n{agg_level.replace('_', ' ').title()} - Classification Metrics:")
-            print(f" - Accuracy:   {metrics[f'{prefix}{agg_level}_accuracy']:.4f}")
-            print(f" - Precision:  {metrics[f'{prefix}{agg_level}_precision']:.4f}")
-            print(f" - Recall:     {metrics[f'{prefix}{agg_level}_recall']:.4f}")
-            print(f" - F1 Score:   {metrics[f'{prefix}{agg_level}_f1']:.4f}")
+        print(f"  - LM Loss:    {metrics.get(f'{prefix}lm_loss', 0):.4f}")
+        print(f"  - Probe Loss: {metrics.get(f'{prefix}probe_loss', 0):.4f}")
 
-            if f'{prefix}{agg_level}_auc' in metrics:
-                print(f" - AUC:        {metrics[f'{prefix}{agg_level}_auc']:.4f}")
-            if f'{prefix}{agg_level}_recall_at_0.1_fpr' in metrics:
-                print(f" - Recall @ 0.1 FPR: {metrics[f'{prefix}{agg_level}_recall_at_0.1_fpr']:.4f}")
-            if f'{prefix}{agg_level}_threshold_optimized_accuracy' in metrics:
-                print(f" - Optimized Accuracy: {metrics[f'{prefix}{agg_level}_threshold_optimized_accuracy']:.4f}")
-                print(f"   (Optimal Threshold: {metrics[f'{prefix}{agg_level}_optimal_threshold']:.4f})")
+    # Support both flat dicts (legacy) and nested dicts from evaluate_predictions
+    def _print_level(level_name: str, m: dict) -> None:
+        print(f"\n  [{level_name}]")
+        for key in ("accuracy", "precision", "recall", "f1", "auc",
+                    "recall_at_0.1_fpr", "recall_at_0.6_fpr",
+                    "threshold_optimized_accuracy", "optimal_threshold"):
+            if key in m:
+                print(f"    - {key:<35s}: {m[key]:.4f}")
+        counts = {k: m[k] for k in ("total_samples", "true_positive_count",
+                                     "true_negative_count") if k in m}
+        if counts:
+            print(f"    - samples: {counts.get('total_samples', '?')}  "
+                  f"(pos={counts.get('true_positive_count', '?')}, "
+                  f"neg={counts.get('true_negative_count', '?')})")
 
-            # Print baselines if labels provided
-            if all_labels and agg_level in all_labels:
-                labels = np.array(all_labels[agg_level])
-                if len(labels) > 0:
-                    # Majority class baseline
-                    majority_class = 1 if np.sum(labels) >= len(labels) / 2 else 0
-                    majority_baseline = accuracy_score(labels, np.full_like(labels, majority_class))
-                    print(f"    (Majority baseline: {majority_baseline:.4f})")
-    
-    print("\n==============================\n")
+    # Nested format: {"token": {...}, "span_max": {...}, "span_mean": {...}}
+    nested_keys = {"token", "span_max", "span_mean"}
+    if any(k in metrics for k in nested_keys):
+        for level in ("token", "span_mean", "span_max"):
+            if level in metrics:
+                _print_level(level, metrics[level])
+    else:
+        # Flat format: backward-compatible with existing callers
+        for agg_level in ["all", "span", "span_max"]:
+            if f"{prefix}{agg_level}_accuracy" in metrics:
+                _print_level(agg_level.replace("_", " ").title(), {
+                    k.replace(f"{prefix}{agg_level}_", ""): v
+                    for k, v in metrics.items()
+                    if k.startswith(f"{prefix}{agg_level}_")
+                })
+        # Plain flat (e.g. direct compute_clf_metrics output)
+        if "accuracy" in metrics and not any(
+            f"{prefix}{a}_accuracy" in metrics for a in ["all", "span", "span_max"]
+        ):
+            _print_level("token", metrics)
+
+    print("\n" + "=" * 40 + "\n")

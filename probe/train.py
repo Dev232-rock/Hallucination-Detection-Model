@@ -28,7 +28,7 @@ from tqdm import tqdm
 from transformers import AutoTokenizer, get_cosine_schedule_with_warmup
 
 from utils.files_utlis import load_yaml, save_json
-from utils.metrics import compute_clf_metrics, plot_roc_curves, print_eval_metrics
+from utils.metrics import compute_clf_metrics, evaluate_predictions, plot_roc_curves, print_eval_metrics
 from utils.model_utils import get_device, load_model_and_tokenizer, print_trainable_parameters, setup_lora_for_layers
 
 from .config import TrainingConfig
@@ -79,21 +79,29 @@ def evaluate(
     device: torch.device,
     dataset_id: str = "",
 ) -> Dict[str, float]:
-    """Run evaluation and return a metrics dict."""
+    """Run evaluation and return a metrics dict (token-level + span-level)."""
     model.eval()
 
     all_probs: List[float] = []
     all_labels: List[float] = []
     all_preds: List[float] = []
 
+    # Span-level accumulation
+    all_pos_spans: List[List[int]] = []
+    all_neg_spans: List[List[int]] = []
+    token_offset: int = 0
+
     for batch in tqdm(dataloader, desc=f"Evaluating {dataset_id}"):
         batch = {k: v.to(device) if isinstance(v, torch.Tensor) else v for k, v in batch.items()}
         outputs = model(**batch)
-        probs = outputs["probe_probs"].cpu().float()
+        probs = outputs["probe_probs"].cpu().float()   # (batch, seq_len)
         labels = batch["classification_labels"].cpu().float()
+
+        batch_size, seq_len = probs.shape
 
         valid_mask = labels != -100.0
         if not valid_mask.any():
+            token_offset += batch_size * seq_len
             continue
 
         valid_probs = probs[valid_mask].numpy().flatten()
@@ -104,14 +112,47 @@ def evaluate(
         all_labels.extend(valid_labels.tolist())
         all_preds.extend(valid_preds.tolist())
 
+        # Accumulate span indices with per-sample offset
+        pos_spans_batch = batch.get("pos_spans", [])
+        neg_spans_batch = batch.get("neg_spans", [])
+        for sample_idx in range(batch_size):
+            sample_offset = token_offset + sample_idx * seq_len
+            if sample_idx < len(pos_spans_batch):
+                for span in pos_spans_batch[sample_idx]:
+                    all_pos_spans.append([i + sample_offset for i in span])
+            if sample_idx < len(neg_spans_batch):
+                for span in neg_spans_batch[sample_idx]:
+                    all_neg_spans.append([i + sample_offset for i in span])
+
+        token_offset += batch_size * seq_len
+
     if not all_labels:
         return {}
 
-    metrics = compute_clf_metrics(
-        preds=np.array(all_preds),
-        labels=np.array(all_labels),
-        probs=np.array(all_probs),
-    )
+    probs_arr  = np.array(all_probs)
+    labels_arr = np.array(all_labels)
+    preds_arr  = np.array(all_preds)
+
+    # Token-level metrics
+    metrics: Dict = {}
+    if len(np.unique(labels_arr)) >= 2:
+        metrics["token"] = compute_clf_metrics(
+            preds=preds_arr, labels=labels_arr, probs=probs_arr
+        )
+
+    # Span-level metrics (max aggregation, quick proxy for per-epoch logging)
+    from utils.metrics import compute_span_level_metrics
+    for agg in ("max", "mean"):
+        span_m = compute_span_level_metrics(
+            token_probs=probs_arr,
+            pos_spans=all_pos_spans,
+            neg_spans=all_neg_spans,
+            threshold=0.5,
+            aggregation=agg,
+        )
+        if span_m:
+            metrics[f"span_{agg}"] = span_m
+
     return metrics
 
 
@@ -277,15 +318,26 @@ def train(config: TrainingConfig) -> None:
                 collate_fn=collate_fn,
             )
             metrics = evaluate(probed_model, eval_loader, device, dataset_id=ds_id)
-            prefixed = {f"{ds_id}/{k}": v for k, v in metrics.items()}
+            # Flatten nested metrics for W&B / checkpoint comparison
+            prefixed: Dict[str, float] = {}
+            for level, level_metrics in metrics.items():
+                if isinstance(level_metrics, dict):
+                    for k, v in level_metrics.items():
+                        prefixed[f"{ds_id}/{level}/{k}"] = v
+                else:
+                    prefixed[f"{ds_id}/{level}"] = level_metrics
             all_eval_metrics.update(prefixed)
             print_eval_metrics(metrics, metric_key_prefix=ds_id)
 
         if use_wandb and all_eval_metrics:
             wandb.log({"epoch": epoch + 1, **all_eval_metrics})
 
-        # Save best checkpoint
-        auc = all_eval_metrics.get(list(all_eval_metrics.keys())[0].split("/")[0] + "/auc", 0.0)
+        # Save best checkpoint — use token-level AUC as the primary signal
+        first_ds = list(eval_datasets.keys())[0] if eval_datasets else ""
+        auc = all_eval_metrics.get(f"{first_ds}/token/auc", 0.0)
+        if auc == 0.0:
+            # Fallback: grab any AUC key present
+            auc = next((v for k, v in all_eval_metrics.items() if k.endswith("/auc")), 0.0)
         if auc >= best_auc:
             best_auc = auc
             probed_model.save(save_dir)

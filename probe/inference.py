@@ -25,7 +25,9 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import List, Optional, Tuple, Union
 
+import numpy as np
 import torch
+import torch.nn.functional as F
 from transformers import AutoTokenizer
 
 from utils.model_utils import get_device, load_model_and_tokenizer
@@ -248,10 +250,108 @@ class HallucinationDetector:
     def detect_batch(
         self,
         pairs: List[Tuple[str, str]],
+        batch_size: int = 8,
         **kwargs,
     ) -> List[DetectionResult]:
-        """Run detect on a list of (prompt, completion) pairs."""
-        return [self.detect(p, c, **kwargs) for p, c in pairs]
+        """Run batched inference over a list of ``(prompt, completion)`` pairs.
+
+        Instead of calling :meth:`detect` sequentially (one forward pass per
+        sample), this method pads all pairs in each mini-batch to the same
+        length and performs **a single forward pass per batch**, giving
+        substantially better GPU utilisation.
+
+        Args:
+            pairs:      List of ``(prompt, completion)`` tuples.
+            batch_size: Number of pairs to process per forward pass.
+            **kwargs:   Extra keyword arguments forwarded to :meth:`detect`
+                        (e.g. ``return_token_scores``).
+
+        Returns:
+            List of :class:`DetectionResult` in the same order as *pairs*.
+        """
+        return_token_scores = kwargs.get("return_token_scores", True)
+        results: List[DetectionResult] = []
+
+        for batch_start in range(0, len(pairs), batch_size):
+            batch_pairs = pairs[batch_start : batch_start + batch_size]
+
+            # ── 1. Tokenise each pair independently so we know the lengths ──
+            encodings = []
+            conversations = []
+            for prompt, completion in batch_pairs:
+                conversation = [
+                    {"role": "user",      "content": prompt},
+                    {"role": "assistant", "content": completion},
+                ]
+                full_text = self.tokenizer.apply_chat_template(conversation, tokenize=False)
+                if self.tokenizer.bos_token and self.tokenizer.bos_token in full_text:
+                    full_text = full_text.replace(self.tokenizer.bos_token, "")
+                conversations.append((prompt, completion, full_text))
+
+            # Batch-tokenise with left-padding so the *last* token positions
+            # are aligned (right-padding would misalign completions).
+            orig_padding_side = self.tokenizer.padding_side
+            self.tokenizer.padding_side = "left"
+            batch_enc = self.tokenizer(
+                [c[2] for c in conversations],
+                return_tensors="pt",
+                truncation=True,
+                max_length=2048,
+                padding=True,
+            )
+            self.tokenizer.padding_side = orig_padding_side  # restore
+
+            input_ids      = batch_enc["input_ids"].to(self.device)       # (B, L)
+            attention_mask = batch_enc["attention_mask"].to(self.device)  # (B, L)
+
+            # ── 2. Single forward pass ──
+            with torch.no_grad():
+                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
+            all_probs = outputs["probe_probs"].cpu().float()  # (B, L)
+
+            # ── 3. Slice per-sample results ──
+            for i, (prompt, completion, full_text) in enumerate(conversations):
+                probs_i      = all_probs[i]          # (L,)
+                input_ids_i  = input_ids[i]          # (L,)
+                attn_mask_i  = attention_mask[i]     # (L,)
+                seq_len      = int(attn_mask_i.sum()) # unpadded length
+
+                # Trim left-padding
+                probs_i     = probs_i[-seq_len:]     # (seq_len,)
+                input_ids_i = input_ids_i[-seq_len:] # (seq_len,)
+
+                # Find where the assistant response starts
+                input_str = self.tokenizer.decode(input_ids_i)
+                from utils.tokenization import find_assistant_tokens_slice
+                assistant_slice   = find_assistant_tokens_slice(input_ids_i, input_str, self.tokenizer)
+                completion_start  = assistant_slice.stop
+
+                completion_probs  = probs_i[completion_start:].numpy()
+                completion_tokens = [
+                    self.tokenizer.decode(input_ids_i[j])
+                    for j in range(completion_start, len(input_ids_i))
+                ]
+
+                hallucinated_spans = self._extract_spans(
+                    probs=completion_probs,
+                    tokens=completion_tokens,
+                    offset=completion_start,
+                )
+
+                max_score      = float(completion_probs.max()) if len(completion_probs) > 0 else 0.0
+                is_hallucinated = max_score >= self.threshold
+
+                results.append(DetectionResult(
+                    prompt=prompt,
+                    completion=completion,
+                    token_scores=completion_probs.tolist() if return_token_scores else [],
+                    token_texts=completion_tokens,
+                    hallucinated_spans=hallucinated_spans,
+                    is_hallucinated=is_hallucinated,
+                    max_score=max_score,
+                ))
+
+        return results
 
     # ------------------------------------------------------------------
     # Span extraction
@@ -289,8 +389,98 @@ class HallucinationDetector:
         return spans
 
     # ------------------------------------------------------------------
-    # Pretty display
+    # Threshold calibration
     # ------------------------------------------------------------------
+
+    def calibrate(
+        self,
+        validation_pairs: List[Tuple[str, str, float]],
+        metric: str = "f1",
+        batch_size: int = 8,
+        save_path: Optional[Union[str, Path]] = None,
+    ) -> float:
+        """Find the optimal decision threshold from a labelled validation set.
+
+        The method sweeps 100 candidate thresholds between 0 and 1 and picks
+        the one that maximises *metric* at the **span level** (max-aggregation).
+        The best threshold is stored in ``self.threshold`` and, optionally,
+        persisted to disk.
+
+        Args:
+            validation_pairs: List of ``(prompt, completion, label)`` triples
+                where *label* is ``1.0`` (hallucinated) or ``0.0`` (factual)
+                at the **response level** (sentence/response granularity).
+            metric:    One of ``"f1"``, ``"accuracy"``, ``"auc"``.
+            batch_size: Batch size for inference.
+            save_path: If provided, writes ``{"threshold": <value>}`` to this
+                JSON file so it can be reloaded later.
+
+        Returns:
+            The best threshold found.
+        """
+        if not validation_pairs:
+            raise ValueError("validation_pairs must not be empty")
+
+        pairs      = [(p, c) for p, c, _ in validation_pairs]
+        true_labels = np.array([float(l) for _, _, l in validation_pairs])
+
+        print(f"Calibrating threshold on {len(pairs)} validation pairs ...")
+        results = self.detect_batch(pairs, batch_size=batch_size, return_token_scores=True)
+
+        # Per-response score: max token probability in the completion
+        pred_scores = np.array([
+            max(r.token_scores) if r.token_scores else 0.0
+            for r in results
+        ])
+
+        if len(np.unique(true_labels)) < 2:
+            print("Warning: only one class present in validation set — cannot calibrate.")
+            return self.threshold
+
+        best_threshold = 0.5
+        best_value     = -1.0
+        candidates     = np.linspace(0.0, 1.0, 101)
+
+        from sklearn.metrics import f1_score, accuracy_score, roc_auc_score
+
+        for t in candidates:
+            preds = (pred_scores >= t).astype(float)
+            if metric == "f1":
+                value = f1_score(true_labels, preds, zero_division=0)
+            elif metric == "accuracy":
+                value = accuracy_score(true_labels, preds)
+            elif metric == "auc":
+                # AUC is threshold-independent; just compute it once
+                value = roc_auc_score(true_labels, pred_scores)
+            else:
+                raise ValueError(f"Unknown metric '{metric}'. Choose from: f1, accuracy, auc.")
+
+            if value > best_value:
+                best_value     = value
+                best_threshold = float(t)
+
+            if metric == "auc":
+                break  # AUC doesn't depend on threshold
+
+        self.threshold = best_threshold
+        print(f"  Best threshold = {best_threshold:.4f}  ({metric} = {best_value:.4f})")
+
+        if save_path is not None:
+            import json
+            save_path = Path(save_path)
+            save_path.parent.mkdir(parents=True, exist_ok=True)
+            with open(save_path, "w") as f:
+                json.dump({"threshold": best_threshold, metric: best_value}, f, indent=2)
+            print(f"  Threshold saved → {save_path}")
+
+        return best_threshold
+
+    @classmethod
+    def load_threshold(cls, path: Union[str, Path]) -> float:
+        """Load a previously calibrated threshold from a JSON file."""
+        with open(path) as f:
+            data = json.load(f)
+        return float(data["threshold"])
 
     def highlight(self, result: DetectionResult) -> str:
         """Return the completion with hallucinated spans wrapped in [[ ]]."""
