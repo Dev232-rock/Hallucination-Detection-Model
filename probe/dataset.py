@@ -456,7 +456,6 @@ class _StreamingAdapter:
         self._num_skipped_spans = 0
         self._num_added_spans = 0
         self.debug_mode = False
-        self.debug_mode = True 
 
     # Delegate to the same method body as TokenizedProbingDataset
     _compute_positional_labels = TokenizedProbingDataset._compute_positional_labels
