@@ -1,4 +1,4 @@
-"""High-level inference API for hallucination detection.
+"""High-level inference API for hallucination detection with multi-signal ensemble scoring.
 
 Usage (Python):
     from probe.inference import HallucinationDetector
@@ -8,12 +8,14 @@ Usage (Python):
         completion="Paris is the capital of France and was founded in 200 BC by the Romans."
     )
     print(result)
+    print(detector.explain_prediction(result))
 
 Usage (CLI):
     python -m probe.inference \\
         --probe_id llama3_1_8b_lora_lambda_kl=0.5 \\
         --prompt "What is the capital of France?" \\
-        --completion "Paris is the capital of France and was founded in 200 BC."
+        --completion "Paris is the capital of France and was founded in 200 BC." \\
+        --scoring_mode ensemble --explain
 """
 
 from __future__ import annotations
@@ -21,9 +23,10 @@ from __future__ import annotations
 import argparse
 import json
 import re
+import time
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import List, Optional, Tuple, Union
+from typing import Any, Dict, List, Optional, Tuple, Union
 
 import numpy as np
 import torch
@@ -35,7 +38,7 @@ from utils.tokenization import find_assistant_tokens_slice
 from utils.probe_loader import download_probe_from_hf
 
 from .config import ProbeConfig
-from .model import ProbedModel
+from .model import ProbedModel, MultiSignalScorer
 
 
 # ---------------------------------------------------------------------------
@@ -44,75 +47,122 @@ from .model import ProbedModel
 
 @dataclass
 class SpanResult:
-    """A detected hallucinated span with its score."""
+    """A detected hallucinated span with multi-signal diagnostic scores."""
     text: str
     start_token: int
     end_token: int
-    score: float          # mean hallucination probability over the span
+    score: float                      # active decision score (e.g., ensemble probability)
+    probe_score: float = 0.0          # internal latent representation probability
+    entropy_score: float = 0.0        # next-token predictive uncertainty
+    attention_score: float = 0.0      # attention dispersion / context decoupling
+    dominant_signal: str = "ensemble" # which signal contributed most to the detection
+    category: str = "general"         # taxonomy category (e.g., entity_fabrication, context_drift)
+
+    def to_dict(self) -> dict:
+        return {
+            "text": self.text,
+            "start_token": self.start_token,
+            "end_token": self.end_token,
+            "score": round(float(self.score), 4),
+            "probe_score": round(float(self.probe_score), 4),
+            "entropy_score": round(float(self.entropy_score), 4),
+            "attention_score": round(float(self.attention_score), 4),
+            "dominant_signal": self.dominant_signal,
+            "category": self.category,
+        }
 
 
 @dataclass
 class SentenceResult:
-    """Aggregated hallucination score for one sentence in the completion."""
-    text: str             # sentence text
-    score: float          # max token hallucination probability within the sentence
-    mean_score: float     # mean token hallucination probability within the sentence
-    is_hallucinated: bool # True if score >= detector threshold
+    """Aggregated multi-signal hallucination scores for one sentence in the completion."""
+    text: str                          # sentence text
+    score: float                       # max active score within the sentence
+    mean_score: float                  # mean active score within the sentence
+    is_hallucinated: bool              # True if max score >= detector threshold
+    probe_score: float = 0.0           # mean probe probability in this sentence
+    entropy_score: float = 0.0         # mean predictive entropy in this sentence
+    attention_score: float = 0.0       # mean attention dispersion in this sentence
+    dominant_signal: str = "ensemble"
+
+    def to_dict(self) -> dict:
+        return {
+            "text": self.text,
+            "score": round(float(self.score), 4),
+            "mean_score": round(float(self.mean_score), 4),
+            "is_hallucinated": bool(self.is_hallucinated),
+            "probe_score": round(float(self.probe_score), 4),
+            "entropy_score": round(float(self.entropy_score), 4),
+            "attention_score": round(float(self.attention_score), 4),
+            "dominant_signal": self.dominant_signal,
+        }
 
 
 @dataclass
 class DetectionResult:
-    """Full detection output for one (prompt, completion) pair."""
+    """Full multi-signal detection output for one (prompt, completion) pair."""
     prompt: str
     completion: str
-    token_scores: List[float]       # per-token hallucination probability
-    token_texts: List[str]          # decoded text for each token
+    token_scores: List[float]                       # active decision scores per token
+    token_texts: List[str]                          # decoded token strings
     hallucinated_spans: List[SpanResult] = field(default_factory=list)
     sentence_scores: List[SentenceResult] = field(default_factory=list)
-    is_hallucinated: bool = False   # True if any span exceeds threshold
+    is_hallucinated: bool = False
     max_score: float = 0.0
+
+    # Multi-signal breakdowns
+    token_probe_scores: List[float] = field(default_factory=list)
+    token_entropy_scores: List[float] = field(default_factory=list)
+    token_attention_scores: List[float] = field(default_factory=list)
+    token_ensemble_scores: List[float] = field(default_factory=list)
+    layer_attribution: Optional[Dict[str, List[float]]] = None
+
+    scoring_mode: str = "ensemble"
+    signal_weights: Dict[str, float] = field(default_factory=dict)
+    diagnostics: Dict[str, Any] = field(default_factory=dict)
+
+    @property
+    def hallucination_score(self) -> float:
+        """Alias for max_score for backwards compatibility."""
+        return self.max_score
 
     def to_dict(self) -> dict:
         return {
             "prompt": self.prompt,
             "completion": self.completion,
             "is_hallucinated": self.is_hallucinated,
-            "max_score": self.max_score,
-            "hallucinated_spans": [
-                {
-                    "text": s.text,
-                    "start_token": s.start_token,
-                    "end_token": s.end_token,
-                    "score": s.score,
-                }
-                for s in self.hallucinated_spans
-            ],
-            "sentence_scores": [
-                {
-                    "text": s.text,
-                    "score": s.score,
-                    "mean_score": s.mean_score,
-                    "is_hallucinated": s.is_hallucinated,
-                }
-                for s in self.sentence_scores
-            ],
-            "token_scores": self.token_scores,
+            "max_score": round(float(self.max_score), 4),
+            "scoring_mode": self.scoring_mode,
+            "signal_weights": self.signal_weights,
+            "hallucinated_spans": [s.to_dict() for s in self.hallucinated_spans],
+            "sentence_scores": [s.to_dict() for s in self.sentence_scores],
+            "token_scores": [round(float(s), 4) for s in self.token_scores],
+            "token_probe_scores": [round(float(s), 4) for s in self.token_probe_scores],
+            "token_entropy_scores": [round(float(s), 4) for s in self.token_entropy_scores],
+            "token_attention_scores": [round(float(s), 4) for s in self.token_attention_scores],
+            "token_ensemble_scores": [round(float(s), 4) for s in self.token_ensemble_scores],
+            "layer_attribution": self.layer_attribution,
+            "diagnostics": self.diagnostics,
         }
 
     def __str__(self) -> str:
         lines = [
-            f"Hallucinated: {self.is_hallucinated}  (max score: {self.max_score:.3f})",
+            f"Hallucinated: {self.is_hallucinated}  (max score: {self.max_score:.3f}, mode: {self.scoring_mode})",
         ]
         if self.hallucinated_spans:
-            lines.append("Detected spans:")
+            lines.append("Detected Spans (Multi-Signal Breakdown):")
             for span in self.hallucinated_spans:
-                lines.append(f"  [{span.score:.3f}] \"{span.text}\"")
+                lines.append(
+                    f"  [{span.score:.3f}] \"{span.text}\" "
+                    f"[Probe: {span.probe_score:.2f} | Entropy: {span.entropy_score:.2f} | Attn: {span.attention_score:.2f}] "
+                    f"→ {span.category.upper()} (Dominant: {span.dominant_signal})"
+                )
         else:
             lines.append("No hallucinations detected.")
+
         if self.sentence_scores:
-            lines.append("Sentence scores:")
+            lines.append("Sentence Scores:")
             for s in self.sentence_scores:
-                flag = " ⚠" if s.is_hallucinated else ""
+                flag = " ⚠ [HALLUCINATED]" if s.is_hallucinated else " ✓ [FACTUAL]"
                 lines.append(f"  [{s.score:.3f}]{flag} {s.text[:80].strip()!r}")
         return "\n".join(lines)
 
@@ -122,14 +172,22 @@ class DetectionResult:
 # ---------------------------------------------------------------------------
 
 class HallucinationDetector:
-    """Friendly inference wrapper around a trained ProbedModel.
+    """Friendly inference wrapper around a trained ProbedModel with multi-signal fusion.
+
+    Signals combined:
+    1. Probe Head Probabilities (internal hidden activation classification).
+    2. Predictive Token Entropy (generation confidence & logit margin).
+    3. Attention Dispersion (context decoupling from prompt grounding).
 
     Args:
-        probed_model:  Trained ProbedModel.
-        tokenizer:     Matching tokenizer.
-        threshold:     Per-token probability above which a token is flagged.
-        min_span_tokens: Minimum consecutive flagged tokens to form a span.
-        device:        Torch device to run on.
+        probed_model:       Trained ProbedModel.
+        tokenizer:          Matching tokenizer.
+        threshold:          Hallucination decision threshold.
+        min_span_tokens:    Minimum consecutive tokens required to form a span.
+        device:             Torch device to run inference on.
+        scoring_mode:       Scoring strategy ('ensemble', 'probe_only', 'entropy_only', 'attention_only').
+        signal_weights:     Weights for ensembling {'probe': 0.55, 'entropy': 0.25, 'attention': 0.20}.
+        output_attentions:  Whether to extract attention matrices for dispersion analysis.
     """
 
     def __init__(
@@ -139,11 +197,17 @@ class HallucinationDetector:
         threshold: float = 0.5,
         min_span_tokens: int = 1,
         device: Optional[torch.device] = None,
+        scoring_mode: str = "ensemble",
+        signal_weights: Optional[Dict[str, float]] = None,
+        output_attentions: bool = True,
     ):
         self.model = probed_model
         self.tokenizer = tokenizer
         self.threshold = threshold
         self.min_span_tokens = min_span_tokens
+        self.scoring_mode = scoring_mode
+        self.signal_weights = signal_weights or dict(MultiSignalScorer.DEFAULT_WEIGHTS)
+        self.output_attentions = output_attentions
         self.device = device or get_device()
         self.model.to(self.device)
         self.model.eval()
@@ -160,15 +224,23 @@ class HallucinationDetector:
         load_from: str = "disk",
         hf_repo_id: str = "andyrdt/hallucination-probes",
         threshold: float = 0.5,
+        scoring_mode: str = "ensemble",
+        signal_weights: Optional[Dict[str, float]] = None,
+        output_attentions: bool = True,
+        device: Optional[str] = None,
     ) -> "HallucinationDetector":
         """Load a detector from a saved probe (disk or HuggingFace Hub).
 
         Args:
-            probe_id:   Identifier of the probe (directory name under value_head_probes/).
-            model_name: Override the base model name (defaults to auto-detected).
-            load_from:  ``"disk"`` or ``"hf"``.
-            hf_repo_id: HuggingFace repo for ``load_from="hf"``.
-            threshold:  Hallucination score threshold.
+            probe_id:           Identifier of the probe (directory under value_head_probes/).
+            model_name:         Override base model name.
+            load_from:          ``"disk"`` or ``"hf"``.
+            hf_repo_id:         HuggingFace repo ID if downloading.
+            threshold:          Decision threshold.
+            scoring_mode:       ``"ensemble"``, ``"probe_only"``, ``"entropy_only"``, or ``"attention_only"``.
+            signal_weights:     Custom weight dictionary for signal fusion.
+            output_attentions:  Whether to compute attention dispersion.
+            device:             Device override ('cuda', 'cpu', 'auto').
         """
         config = ProbeConfig(
             probe_id=probe_id,
@@ -184,15 +256,18 @@ class HallucinationDetector:
                 probe_id=probe_id,
             )
 
-        device = get_device()
+        actual_device = get_device() if (device is None or device == "auto") else torch.device(device)
         _, tokenizer = load_model_and_tokenizer(config.model_name)
-        probed_model = ProbedModel.load(config=config, path=config.probe_path)
+        probed_model = ProbedModel.load(config=config, path=config.probe_path, map_location=str(actual_device))
 
         return cls(
             probed_model=probed_model,
             tokenizer=tokenizer,
             threshold=threshold,
-            device=device,
+            device=actual_device,
+            scoring_mode=scoring_mode,
+            signal_weights=signal_weights,
+            output_attentions=output_attentions,
         )
 
     # ------------------------------------------------------------------
@@ -206,17 +281,17 @@ class HallucinationDetector:
         completion: str,
         return_token_scores: bool = True,
     ) -> DetectionResult:
-        """Detect hallucinations in a (prompt, completion) pair.
+        """Detect hallucinations in a (prompt, completion) pair using multi-signal scoring.
 
         Args:
-            prompt:             The user's question / context.
-            completion:         The model's response to analyse.
-            return_token_scores: If False, token_scores list is omitted for speed.
+            prompt:             The user query or context.
+            completion:         The assistant response to analyze.
+            return_token_scores: If True, returns full token score arrays.
 
         Returns:
-            A :class:`DetectionResult` with hallucinated spans and scores.
+            A :class:`DetectionResult` with spans, multi-signal scores, and layer diagnostics.
         """
-        # Tokenise as a conversation
+        # Tokenize conversation
         conversation = [
             {"role": "user",      "content": prompt},
             {"role": "assistant", "content": completion},
@@ -234,42 +309,111 @@ class HallucinationDetector:
         input_ids = encoding["input_ids"].to(self.device)
         attention_mask = encoding["attention_mask"].to(self.device)
 
-        # Run model
-        outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
-        probs = outputs["probe_probs"][0].cpu().float()  # (seq_len,)
-
-        # Decode tokens
         seq_len = input_ids.shape[1]
         token_texts = [self.tokenizer.decode(input_ids[0, i]) for i in range(seq_len)]
 
-        # Find where the assistant response starts
+        # Find where completion starts
         input_str = self.tokenizer.decode(input_ids[0])
         assistant_slice = find_assistant_tokens_slice(input_ids[0], input_str, self.tokenizer)
         completion_start = assistant_slice.stop
 
-        # Only score tokens in the completion
-        completion_probs = probs[completion_start:].numpy()
-        completion_tokens = token_texts[completion_start:]
+        # Run model with multi-signal computation
+        outputs = self.model(
+            input_ids=input_ids,
+            attention_mask=attention_mask,
+            output_attentions=self.output_attentions,
+            compute_multi_signal=True,
+            prompt_length=completion_start,
+            signal_weights=self.signal_weights,
+            return_layer_breakdown=True,
+        )
 
-        # Extract contiguous hallucinated spans
-        hallucinated_spans = self._extract_spans(
-            probs=completion_probs,
-            tokens=completion_tokens,
+        # Extract per-signal probabilities
+        probe_probs = outputs["probe_probs"][0].cpu().float().numpy()
+        entropy_scores = (
+            outputs["entropy_scores"][0].cpu().float().numpy()
+            if "entropy_scores" in outputs and outputs["entropy_scores"] is not None
+            else np.zeros_like(probe_probs)
+        )
+        attention_scores = (
+            outputs["attention_dispersion_scores"][0].cpu().float().numpy()
+            if "attention_dispersion_scores" in outputs and outputs["attention_dispersion_scores"] is not None
+            else np.zeros_like(probe_probs)
+        )
+        ensemble_scores = (
+            outputs["ensemble_scores"][0].cpu().float().numpy()
+            if "ensemble_scores" in outputs and outputs["ensemble_scores"] is not None
+            else probe_probs
+        )
+
+        # Slice for completion tokens
+        c_tokens = token_texts[completion_start:]
+        c_probe = probe_probs[completion_start:]
+        c_entropy = entropy_scores[completion_start:]
+        c_attn = attention_scores[completion_start:]
+        c_ensemble = ensemble_scores[completion_start:]
+
+        # Choose active scores according to scoring_mode
+        if self.scoring_mode == "probe_only":
+            active_scores = c_probe
+        elif self.scoring_mode == "entropy_only":
+            active_scores = c_entropy
+        elif self.scoring_mode == "attention_only":
+            active_scores = c_attn
+        else:
+            active_scores = c_ensemble
+
+        # Extract multi-signal spans
+        hallucinated_spans = self._extract_spans_multisignal(
+            active_scores=active_scores,
+            probe_scores=c_probe,
+            entropy_scores=c_entropy,
+            attn_scores=c_attn,
+            tokens=c_tokens,
             offset=completion_start,
         )
 
-        max_score = float(completion_probs.max()) if len(completion_probs) > 0 else 0.0
+        max_score = float(active_scores.max()) if len(active_scores) > 0 else 0.0
         is_hallucinated = max_score >= self.threshold
 
-        return DetectionResult(
+        # Extract layer attributions if available
+        layer_attribution_dict: Optional[Dict[str, List[float]]] = None
+        if "layer_attributions" in outputs and outputs["layer_attributions"] is not None:
+            l_data = outputs["layer_attributions"]
+            layer_attribution_dict = {}
+            for lyr, tensor_prob in l_data.get("layer_probs", {}).items():
+                layer_attribution_dict[lyr] = tensor_prob[0, completion_start:].cpu().float().tolist()
+
+        result = DetectionResult(
             prompt=prompt,
             completion=completion,
-            token_scores=completion_probs.tolist() if return_token_scores else [],
-            token_texts=completion_tokens,
+            token_scores=active_scores.tolist() if return_token_scores else [],
+            token_texts=c_tokens,
             hallucinated_spans=hallucinated_spans,
             is_hallucinated=is_hallucinated,
             max_score=max_score,
+            token_probe_scores=c_probe.tolist() if return_token_scores else [],
+            token_entropy_scores=c_entropy.tolist() if return_token_scores else [],
+            token_attention_scores=c_attn.tolist() if return_token_scores else [],
+            token_ensemble_scores=c_ensemble.tolist() if return_token_scores else [],
+            layer_attribution=layer_attribution_dict,
+            scoring_mode=self.scoring_mode,
+            signal_weights=dict(self.signal_weights),
+            diagnostics={
+                "mean_probe_score": float(np.mean(c_probe)) if len(c_probe) > 0 else 0.0,
+                "mean_entropy_score": float(np.mean(c_entropy)) if len(c_entropy) > 0 else 0.0,
+                "mean_attention_score": float(np.mean(c_attn)) if len(c_attn) > 0 else 0.0,
+                "num_flagged_spans": len(hallucinated_spans),
+            },
         )
+
+        # Also populate sentence scores
+        self.sentence_level_scores(result)
+        return result
+
+    # ------------------------------------------------------------------
+    # Batch inference
+    # ------------------------------------------------------------------
 
     def detect_batch(
         self,
@@ -277,30 +421,12 @@ class HallucinationDetector:
         batch_size: int = 8,
         **kwargs,
     ) -> List[DetectionResult]:
-        """Run batched inference over a list of ``(prompt, completion)`` pairs.
-
-        Instead of calling :meth:`detect` sequentially (one forward pass per
-        sample), this method pads all pairs in each mini-batch to the same
-        length and performs **a single forward pass per batch**, giving
-        substantially better GPU utilisation.
-
-        Args:
-            pairs:      List of ``(prompt, completion)`` tuples.
-            batch_size: Number of pairs to process per forward pass.
-            **kwargs:   Extra keyword arguments forwarded to :meth:`detect`
-                        (e.g. ``return_token_scores``).
-
-        Returns:
-            List of :class:`DetectionResult` in the same order as *pairs*.
-        """
+        """Run batched multi-signal inference over a list of (prompt, completion) pairs."""
         return_token_scores = kwargs.get("return_token_scores", True)
         results: List[DetectionResult] = []
 
         for batch_start in range(0, len(pairs), batch_size):
             batch_pairs = pairs[batch_start : batch_start + batch_size]
-
-            # ── 1. Tokenise each pair independently so we know the lengths ──
-            encodings = []
             conversations = []
             for prompt, completion in batch_pairs:
                 conversation = [
@@ -312,8 +438,6 @@ class HallucinationDetector:
                     full_text = full_text.replace(self.tokenizer.bos_token, "")
                 conversations.append((prompt, completion, full_text))
 
-            # Batch-tokenise with left-padding so the *last* token positions
-            # are aligned (right-padding would misalign completions).
             orig_padding_side = self.tokenizer.padding_side
             self.tokenizer.padding_side = "left"
             batch_enc = self.tokenizer(
@@ -323,76 +447,119 @@ class HallucinationDetector:
                 max_length=2048,
                 padding=True,
             )
-            self.tokenizer.padding_side = orig_padding_side  # restore
+            self.tokenizer.padding_side = orig_padding_side
 
-            input_ids      = batch_enc["input_ids"].to(self.device)       # (B, L)
-            attention_mask = batch_enc["attention_mask"].to(self.device)  # (B, L)
+            input_ids = batch_enc["input_ids"].to(self.device)
+            attention_mask = batch_enc["attention_mask"].to(self.device)
 
-            # ── 2. Single forward pass ──
             with torch.no_grad():
-                outputs = self.model(input_ids=input_ids, attention_mask=attention_mask)
-            all_probs = outputs["probe_probs"].cpu().float()  # (B, L)
+                outputs = self.model(
+                    input_ids=input_ids,
+                    attention_mask=attention_mask,
+                    output_attentions=self.output_attentions,
+                    compute_multi_signal=True,
+                    signal_weights=self.signal_weights,
+                )
 
-            # ── 3. Slice per-sample results ──
-            for i, (prompt, completion, full_text) in enumerate(conversations):
-                probs_i      = all_probs[i]          # (L,)
-                input_ids_i  = input_ids[i]          # (L,)
-                attn_mask_i  = attention_mask[i]     # (L,)
-                seq_len      = int(attn_mask_i.sum()) # unpadded length
+            all_probe = outputs["probe_probs"].cpu().float()
+            all_entropy = (
+                outputs["entropy_scores"].cpu().float()
+                if "entropy_scores" in outputs and outputs["entropy_scores"] is not None
+                else torch.zeros_like(all_probe)
+            )
+            all_attn = (
+                outputs["attention_dispersion_scores"].cpu().float()
+                if "attention_dispersion_scores" in outputs and outputs["attention_dispersion_scores"] is not None
+                else torch.zeros_like(all_probe)
+            )
+            all_ensemble = (
+                outputs["ensemble_scores"].cpu().float()
+                if "ensemble_scores" in outputs and outputs["ensemble_scores"] is not None
+                else all_probe
+            )
 
-                # Trim left-padding
-                probs_i     = probs_i[-seq_len:]     # (seq_len,)
-                input_ids_i = input_ids_i[-seq_len:] # (seq_len,)
+            for i, (prompt, completion, _full_text) in enumerate(conversations):
+                attn_mask_i = attention_mask[i]
+                seq_len = int(attn_mask_i.sum())
 
-                # Find where the assistant response starts
+                probe_i = all_probe[i][-seq_len:].numpy()
+                entropy_i = all_entropy[i][-seq_len:].numpy()
+                attn_i = all_attn[i][-seq_len:].numpy()
+                ensemble_i = all_ensemble[i][-seq_len:].numpy()
+                input_ids_i = input_ids[i][-seq_len:]
+
                 input_str = self.tokenizer.decode(input_ids_i)
-                from utils.tokenization import find_assistant_tokens_slice
-                assistant_slice   = find_assistant_tokens_slice(input_ids_i, input_str, self.tokenizer)
-                completion_start  = assistant_slice.stop
+                assistant_slice = find_assistant_tokens_slice(input_ids_i, input_str, self.tokenizer)
+                completion_start = assistant_slice.stop
 
-                completion_probs  = probs_i[completion_start:].numpy()
-                completion_tokens = [
+                c_tokens = [
                     self.tokenizer.decode(input_ids_i[j])
                     for j in range(completion_start, len(input_ids_i))
                 ]
+                c_probe = probe_i[completion_start:]
+                c_entropy = entropy_i[completion_start:]
+                c_attn = attn_i[completion_start:]
+                c_ensemble = ensemble_i[completion_start:]
 
-                hallucinated_spans = self._extract_spans(
-                    probs=completion_probs,
-                    tokens=completion_tokens,
+                if self.scoring_mode == "probe_only":
+                    active_scores = c_probe
+                elif self.scoring_mode == "entropy_only":
+                    active_scores = c_entropy
+                elif self.scoring_mode == "attention_only":
+                    active_scores = c_attn
+                else:
+                    active_scores = c_ensemble
+
+                hallucinated_spans = self._extract_spans_multisignal(
+                    active_scores=active_scores,
+                    probe_scores=c_probe,
+                    entropy_scores=c_entropy,
+                    attn_scores=c_attn,
+                    tokens=c_tokens,
                     offset=completion_start,
                 )
 
-                max_score      = float(completion_probs.max()) if len(completion_probs) > 0 else 0.0
+                max_score = float(active_scores.max()) if len(active_scores) > 0 else 0.0
                 is_hallucinated = max_score >= self.threshold
 
-                results.append(DetectionResult(
+                res = DetectionResult(
                     prompt=prompt,
                     completion=completion,
-                    token_scores=completion_probs.tolist() if return_token_scores else [],
-                    token_texts=completion_tokens,
+                    token_scores=active_scores.tolist() if return_token_scores else [],
+                    token_texts=c_tokens,
                     hallucinated_spans=hallucinated_spans,
                     is_hallucinated=is_hallucinated,
                     max_score=max_score,
-                ))
+                    token_probe_scores=c_probe.tolist() if return_token_scores else [],
+                    token_entropy_scores=c_entropy.tolist() if return_token_scores else [],
+                    token_attention_scores=c_attn.tolist() if return_token_scores else [],
+                    token_ensemble_scores=c_ensemble.tolist() if return_token_scores else [],
+                    scoring_mode=self.scoring_mode,
+                    signal_weights=dict(self.signal_weights),
+                )
+                self.sentence_level_scores(res)
+                results.append(res)
 
         return results
 
     # ------------------------------------------------------------------
-    # Span extraction
+    # Multi-signal span extraction & taxonomy categorization
     # ------------------------------------------------------------------
 
-    def _extract_spans(
+    def _extract_spans_multisignal(
         self,
-        probs: "np.ndarray",
+        active_scores: np.ndarray,
+        probe_scores: np.ndarray,
+        entropy_scores: np.ndarray,
+        attn_scores: np.ndarray,
         tokens: List[str],
         offset: int,
     ) -> List[SpanResult]:
-        """Merge consecutive above-threshold tokens into spans."""
-        import numpy as np
-
-        flagged = probs >= self.threshold
+        """Merge consecutive above-threshold tokens into spans with multi-signal taxonomy."""
+        flagged = active_scores >= self.threshold
         spans: List[SpanResult] = []
         i = 0
+
         while i < len(flagged):
             if flagged[i]:
                 j = i
@@ -400,12 +567,39 @@ class HallucinationDetector:
                     j += 1
                 if (j - i) >= self.min_span_tokens:
                     span_text = "".join(tokens[i:j])
-                    span_score = float(np.mean(probs[i:j]))
+                    span_score = float(np.mean(active_scores[i:j]))
+                    s_probe = float(np.mean(probe_scores[i:j])) if len(probe_scores) > 0 else 0.0
+                    s_entropy = float(np.mean(entropy_scores[i:j])) if len(entropy_scores) > 0 else 0.0
+                    s_attn = float(np.mean(attn_scores[i:j])) if len(attn_scores) > 0 else 0.0
+
+                    # Determine dominant signal
+                    signal_contributions = {
+                        "probe": s_probe * self.signal_weights.get("probe", 0.55),
+                        "entropy": s_entropy * self.signal_weights.get("entropy", 0.25),
+                        "attention": s_attn * self.signal_weights.get("attention", 0.20),
+                    }
+                    dominant_signal = max(signal_contributions, key=signal_contributions.get)
+
+                    # Determine taxonomy category
+                    if s_probe >= self.threshold and s_entropy >= 0.40:
+                        category = "entity_fabrication"
+                    elif s_attn >= 0.55:
+                        category = "context_drift"
+                    elif s_entropy >= 0.60:
+                        category = "uncertainty_spike"
+                    else:
+                        category = "calibrated_hallucination"
+
                     spans.append(SpanResult(
                         text=span_text,
                         start_token=offset + i,
                         end_token=offset + j - 1,
                         score=span_score,
+                        probe_score=s_probe,
+                        entropy_score=s_entropy,
+                        attention_score=s_attn,
+                        dominant_signal=dominant_signal,
+                        category=category,
                     ))
                 i = j
             else:
@@ -420,32 +614,18 @@ class HallucinationDetector:
         self,
         result: DetectionResult,
     ) -> List[SentenceResult]:
-        """Split the completion into sentences and score each one.
-
-        The score for a sentence is the **max** per-token hallucination
-        probability among all tokens that fall inside that sentence.  The mean
-        is also stored for softer ranking.
-
-        Sentence splitting uses ``nltk.sent_tokenize`` when available,
-        falling back to a simple regex split on punctuation boundaries.
-
-        Args:
-            result: A :class:`DetectionResult` returned by :meth:`detect`.
-
-        Returns:
-            List of :class:`SentenceResult`, one per sentence.  Also stores
-            the list in ``result.sentence_scores`` for convenience.
-        """
+        """Split the completion into sentences and score each one using multi-signal aggregation."""
         if not result.token_scores:
             return []
 
-        probs  = np.array(result.token_scores)   # (n_completion_tokens,)
-        tokens = result.token_texts               # same length
+        probs = np.array(result.token_scores)
+        probe_p = np.array(result.token_probe_scores) if result.token_probe_scores else probs
+        entropy_p = np.array(result.token_entropy_scores) if result.token_entropy_scores else np.zeros_like(probs)
+        attn_p = np.array(result.token_attention_scores) if result.token_attention_scores else np.zeros_like(probs)
+        tokens = result.token_texts
 
-        # Reconstruct the completion text from decoded tokens
         completion_text = "".join(tokens)
 
-        # Split into sentences
         try:
             import nltk
             try:
@@ -455,8 +635,6 @@ class HallucinationDetector:
                 nltk.download("punkt_tab", quiet=True)
                 sentences = nltk.sent_tokenize(completion_text)
         except ImportError:
-            # Fallback: split on sentence-ending punctuation
-            import re
             sentences = re.split(r'(?<=[.!?])\s+', completion_text.strip())
             sentences = [s for s in sentences if s.strip()]
 
@@ -468,144 +646,120 @@ class HallucinationDetector:
         token_cursor = 0
 
         for sent_text in sentences:
-            # Find the start of this sentence in the completion text
             sent_start_char = completion_text.find(sent_text, char_cursor)
             if sent_start_char == -1:
-                # If not found (unlikely), skip
                 char_cursor += len(sent_text)
                 continue
             sent_end_char = sent_start_char + len(sent_text)
 
-            # Map character range → token range by re-assembling tokens
             sent_token_probs: List[float] = []
-            rebuilt = ""
+            sent_probe_probs: List[float] = []
+            sent_entropy_probs: List[float] = []
+            sent_attn_probs: List[float] = []
+
             for t_idx in range(token_cursor, len(tokens)):
-                rebuilt_next = rebuilt + tokens[t_idx]
-                tok_start_char = sum(len(tokens[k]) for k in range(token_cursor, t_idx))
-
-                # Check if this token overlaps with the sentence character range
                 tok_char_start = len("".join(tokens[token_cursor:t_idx]))
-                tok_char_end   = tok_char_start + len(tokens[t_idx])
+                tok_char_end = tok_char_start + len(tokens[t_idx])
 
-                # Map relative to char_cursor
                 abs_tok_start = char_cursor + tok_char_start
-                abs_tok_end   = char_cursor + tok_char_end
+                abs_tok_end = char_cursor + tok_char_end
 
                 if abs_tok_start >= sent_end_char:
-                    break  # past the sentence
+                    break
                 if abs_tok_end <= sent_start_char:
                     token_cursor = t_idx + 1
-                    continue  # before the sentence
+                    continue
 
                 sent_token_probs.append(float(probs[t_idx]) if t_idx < len(probs) else 0.0)
+                sent_probe_probs.append(float(probe_p[t_idx]) if t_idx < len(probe_p) else 0.0)
+                sent_entropy_probs.append(float(entropy_p[t_idx]) if t_idx < len(entropy_p) else 0.0)
+                sent_attn_probs.append(float(attn_p[t_idx]) if t_idx < len(attn_p) else 0.0)
 
             char_cursor = sent_end_char
 
             if not sent_token_probs:
                 sent_token_probs = [0.0]
+                sent_probe_probs = [0.0]
+                sent_entropy_probs = [0.0]
+                sent_attn_probs = [0.0]
 
-            max_score  = float(np.max(sent_token_probs))
+            max_score = float(np.max(sent_token_probs))
             mean_score = float(np.mean(sent_token_probs))
+            mean_probe = float(np.mean(sent_probe_probs))
+            mean_entropy = float(np.mean(sent_entropy_probs))
+            mean_attn = float(np.mean(sent_attn_probs))
+
+            contribs = {
+                "probe": mean_probe * self.signal_weights.get("probe", 0.55),
+                "entropy": mean_entropy * self.signal_weights.get("entropy", 0.25),
+                "attention": mean_attn * self.signal_weights.get("attention", 0.20),
+            }
+            dominant_sig = max(contribs, key=contribs.get)
 
             sentence_results.append(SentenceResult(
                 text=sent_text,
                 score=max_score,
                 mean_score=mean_score,
                 is_hallucinated=max_score >= self.threshold,
+                probe_score=mean_probe,
+                entropy_score=mean_entropy,
+                attention_score=mean_attn,
+                dominant_signal=dominant_sig,
             ))
 
         result.sentence_scores = sentence_results
         return sentence_results
 
-    def calibrate(
-        self,
-        validation_pairs: List[Tuple[str, str, float]],
-        metric: str = "f1",
-        batch_size: int = 8,
-        save_path: Optional[Union[str, Path]] = None,
-    ) -> float:
-        """Find the optimal decision threshold from a labelled validation set.
+    # ------------------------------------------------------------------
+    # Explainability & Diagnostics
+    # ------------------------------------------------------------------
 
-        The method sweeps 100 candidate thresholds between 0 and 1 and picks
-        the one that maximises *metric* at the **span level** (max-aggregation).
-        The best threshold is stored in ``self.threshold`` and, optionally,
-        persisted to disk.
+    def explain_prediction(self, result: DetectionResult) -> str:
+        """Generate a structured diagnostic explanation of the multi-signal detection."""
+        lines = [
+            "=" * 70,
+            "🔍 MULTI-SIGNAL HALLUCINATION DIAGNOSTICS",
+            "=" * 70,
+            f"Overall Status   : {'🚨 HALLUCINATION DETECTED' if result.is_hallucinated else '✅ FACTUALLY GROUNDED'}",
+            f"Max Confidence   : {result.max_score:.4f} (Threshold = {self.threshold:.2f})",
+            f"Active Strategy  : {result.scoring_mode.upper()} "
+            f"[Weights: Probe={result.signal_weights.get('probe', 0):.2f}, "
+            f"Entropy={result.signal_weights.get('entropy', 0):.2f}, "
+            f"Attn={result.signal_weights.get('attention', 0):.2f}]",
+            "-" * 70,
+        ]
 
-        Args:
-            validation_pairs: List of ``(prompt, completion, label)`` triples
-                where *label* is ``1.0`` (hallucinated) or ``0.0`` (factual)
-                at the **response level** (sentence/response granularity).
-            metric:    One of ``"f1"``, ``"accuracy"``, ``"auc"``.
-            batch_size: Batch size for inference.
-            save_path: If provided, writes ``{"threshold": <value>}`` to this
-                JSON file so it can be reloaded later.
+        if not result.hallucinated_spans:
+            lines.append("No suspicious spans detected in the generated completion.")
+        else:
+            lines.append(f"Flagged Spans ({len(result.hallucinated_spans)} detected):")
+            for idx, s in enumerate(result.hallucinated_spans, 1):
+                lines.append(f"\n[{idx}] \"{s.text.strip()}\"")
+                lines.append(f"    • Category        : {s.category.upper()}")
+                lines.append(f"    • Dominant Signal : {s.dominant_signal.upper()}")
+                lines.append(f"    • Fused Score     : {s.score:.4f}")
+                lines.append(f"    • Signal Breakdown: Probe={s.probe_score:.3f} | Entropy={s.entropy_score:.3f} | Attention-Drift={s.attention_score:.3f}")
 
-        Returns:
-            The best threshold found.
-        """
-        if not validation_pairs:
-            raise ValueError("validation_pairs must not be empty")
+                # Explanation rule
+                if s.category == "entity_fabrication":
+                    explanation = "High internal activation divergence combined with elevated predictive entropy indicates model is fabricating entities/dates."
+                elif s.category == "context_drift":
+                    explanation = "Attention decoupled from prompt grounding context, drifting into ungrounded free-form generation."
+                elif s.category == "uncertainty_spike":
+                    explanation = "Spike in logit distribution entropy; model lacked high confidence during next-token selection."
+                else:
+                    explanation = "Calibrated multi-signal agreement triggered decision threshold."
+                lines.append(f"    • Root Cause      : {explanation}")
 
-        pairs      = [(p, c) for p, c, _ in validation_pairs]
-        true_labels = np.array([float(l) for _, _, l in validation_pairs])
+        if result.layer_attribution:
+            lines.append("\n" + "-" * 70)
+            lines.append("Layer Attribution Overview (Top Detection Layers):")
+            for lyr, probs in list(result.layer_attribution.items())[:5]:
+                max_lyr = max(probs) if probs else 0.0
+                lines.append(f"    • Layer {lyr:>2} : peak score = {max_lyr:.3f}")
 
-        print(f"Calibrating threshold on {len(pairs)} validation pairs ...")
-        results = self.detect_batch(pairs, batch_size=batch_size, return_token_scores=True)
-
-        # Per-response score: max token probability in the completion
-        pred_scores = np.array([
-            max(r.token_scores) if r.token_scores else 0.0
-            for r in results
-        ])
-
-        if len(np.unique(true_labels)) < 2:
-            print("Warning: only one class present in validation set — cannot calibrate.")
-            return self.threshold
-
-        best_threshold = 0.5
-        best_value     = -1.0
-        candidates     = np.linspace(0.0, 1.0, 101)
-
-        from sklearn.metrics import f1_score, accuracy_score, roc_auc_score
-
-        for t in candidates:
-            preds = (pred_scores >= t).astype(float)
-            if metric == "f1":
-                value = f1_score(true_labels, preds, zero_division=0)
-            elif metric == "accuracy":
-                value = accuracy_score(true_labels, preds)
-            elif metric == "auc":
-                # AUC is threshold-independent; just compute it once
-                value = roc_auc_score(true_labels, pred_scores)
-            else:
-                raise ValueError(f"Unknown metric '{metric}'. Choose from: f1, accuracy, auc.")
-
-            if value > best_value:
-                best_value     = value
-                best_threshold = float(t)
-
-            if metric == "auc":
-                break  # AUC doesn't depend on threshold
-
-        self.threshold = best_threshold
-        print(f"  Best threshold = {best_threshold:.4f}  ({metric} = {best_value:.4f})")
-
-        if save_path is not None:
-            import json
-            save_path = Path(save_path)
-            save_path.parent.mkdir(parents=True, exist_ok=True)
-            with open(save_path, "w") as f:
-                json.dump({"threshold": best_threshold, metric: best_value}, f, indent=2)
-            print(f"  Threshold saved → {save_path}")
-
-        return best_threshold
-
-    @classmethod
-    def load_threshold(cls, path: Union[str, Path]) -> float:
-        """Load a previously calibrated threshold from a JSON file."""
-        with open(path) as f:
-            data = json.load(f)
-        return float(data["threshold"])
+        lines.append("=" * 70)
+        return "\n".join(lines)
 
     def highlight(self, result: DetectionResult) -> str:
         """Return the completion with hallucinated spans wrapped in [[ ]]."""
@@ -621,25 +775,7 @@ class HallucinationDetector:
         batch_size: int = 16,
         include_sentences: bool = True,
     ) -> int:
-        """Run batch hallucination detection over a JSONL file.
-
-        Each input JSONL line must contain at least "prompt" and "completion".
-        All other fields from the input are preserved, and detection fields are added:
-            - is_hallucinated (bool)
-            - hallucination_score (float)
-            - hallucinated_spans (list of dicts)
-            - highlighted_completion (str)
-            - sentences (list of dicts, if include_sentences is True)
-
-        Args:
-            input_file: Path to input .jsonl file.
-            output_file: Path to output .jsonl file.
-            batch_size: Number of pairs per forward pass.
-            include_sentences: Whether to compute sentence-level scores.
-
-        Returns:
-            Total number of samples processed.
-        """
+        """Run batch hallucination detection over a JSONL file."""
         from tqdm import tqdm
 
         input_path = Path(input_file)
@@ -679,28 +815,13 @@ class HallucinationDetector:
                     out_record = dict(orig_record)
                     out_record["is_hallucinated"] = res.is_hallucinated
                     out_record["hallucination_score"] = float(res.hallucination_score)
-                    out_record["hallucinated_spans"] = [
-                        {
-                            "text": s.text,
-                            "start_token": s.start_token,
-                            "end_token": s.end_token,
-                            "score": float(s.score),
-                        }
-                        for s in res.hallucinated_spans
-                    ]
+                    out_record["scoring_mode"] = res.scoring_mode
+                    out_record["hallucinated_spans"] = [s.to_dict() for s in res.hallucinated_spans]
                     out_record["highlighted_completion"] = self.highlight(res)
 
                     if include_sentences:
                         sent_results = self.sentence_level_scores(res)
-                        out_record["sentences"] = [
-                            {
-                                "text": s.text,
-                                "score": float(s.score),
-                                "mean_score": float(s.mean_score),
-                                "is_hallucinated": s.is_hallucinated,
-                            }
-                            for s in sent_results
-                        ]
+                        out_record["sentences"] = [s.to_dict() for s in sent_results]
 
                     out_f.write(json.dumps(out_record, ensure_ascii=False) + "\n")
                     processed_count += 1
@@ -717,7 +838,7 @@ class HallucinationDetector:
 # ---------------------------------------------------------------------------
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Detect hallucinations in text or JSONL datasets")
+    parser = argparse.ArgumentParser(description="Multi-Signal Hallucination Detector")
     parser.add_argument("--probe_id",          type=str, required=True, help="Probe directory name or HF identifier")
     parser.add_argument("--prompt",            type=str, default=None, help="Input prompt text")
     parser.add_argument("--completion",        type=str, default=None, help="Input completion text")
@@ -725,16 +846,29 @@ def parse_args() -> argparse.Namespace:
     parser.add_argument("--output_file",       type=str, default=None, help="Path to output .jsonl file")
     parser.add_argument("--batch_size",        type=int, default=16, help="Batch size for batch processing")
     parser.add_argument("--threshold",         type=float, default=0.5, help="Hallucination decision threshold")
+    parser.add_argument("--scoring_mode",      type=str, default="ensemble",
+                        choices=["ensemble", "probe_only", "entropy_only", "attention_only"],
+                        help="Signal scoring mode")
+    parser.add_argument("--weight_probe",      type=float, default=0.55, help="Weight for hidden-state probe")
+    parser.add_argument("--weight_entropy",    type=float, default=0.25, help="Weight for predictive logit entropy")
+    parser.add_argument("--weight_attention",  type=float, default=0.20, help="Weight for attention dispersion")
     parser.add_argument("--device",            type=str, default="auto", choices=["auto", "cuda", "cpu", "mps"])
     parser.add_argument("--load_from",         type=str, default="disk", choices=["disk", "hf"])
     parser.add_argument("--hf_repo_id",        type=str, default="andyrdt/hallucination-probes")
-    parser.add_argument("--json",              action="store_true", help="Output JSON instead of human-readable (single mode)")
-    parser.add_argument("--include_sentences", action="store_true", help="Include sentence-level scores in output")
+    parser.add_argument("--json",              action="store_true", help="Output JSON format")
+    parser.add_argument("--include_sentences", action="store_true", help="Include sentence-level scores")
+    parser.add_argument("--explain",           action="store_true", help="Print multi-signal diagnostic explanation")
     return parser.parse_args()
 
 
 def main():
     args = parse_args()
+
+    weights = {
+        "probe": args.weight_probe,
+        "entropy": args.weight_entropy,
+        "attention": args.weight_attention,
+    }
 
     detector = HallucinationDetector.from_pretrained(
         probe_id=args.probe_id,
@@ -742,6 +876,8 @@ def main():
         hf_repo_id=args.hf_repo_id,
         device=args.device,
         threshold=args.threshold,
+        scoring_mode=args.scoring_mode,
+        signal_weights=weights,
     )
 
     if args.input_file:
@@ -758,19 +894,7 @@ def main():
         result = detector.detect(prompt=args.prompt, completion=args.completion)
 
         if args.json:
-            out_data = result.to_dict()
-            if args.include_sentences:
-                sent_results = detector.sentence_level_scores(result)
-                out_data["sentences"] = [
-                    {
-                        "text": s.text,
-                        "score": float(s.score),
-                        "mean_score": float(s.mean_score),
-                        "is_hallucinated": s.is_hallucinated,
-                    }
-                    for s in sent_results
-                ]
-            print(json.dumps(out_data, indent=2))
+            print(json.dumps(result.to_dict(), indent=2))
         else:
             print("\n" + "=" * 60)
             print(result)
@@ -779,9 +903,12 @@ def main():
                 sent_results = detector.sentence_level_scores(result)
                 for i, s in enumerate(sent_results, 1):
                     tag = "🚨 [HALLUCINATION]" if s.is_hallucinated else "✅ [FACTUAL]"
-                    print(f"  {i}. {tag} (max={s.score:.3f}, mean={s.mean_score:.3f}): {s.text}")
+                    print(f"  {i}. {tag} (max={s.score:.3f}, mean={s.mean_score:.3f}, dominant={s.dominant_signal}): {s.text}")
             print("\nHighlighted completion:")
             print(detector.highlight(result))
+
+            if args.explain:
+                print("\n" + detector.explain_prediction(result))
             print("=" * 60)
     else:
         print("Error: Must provide either (--prompt AND --completion) or --input_file")
