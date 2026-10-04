@@ -101,6 +101,79 @@ def compute_metrics(
     return compute_clf_metrics(predictions, labels, probabilities)
 
 
+def bootstrap_confidence_intervals(
+    probs: np.ndarray,
+    labels: np.ndarray,
+    threshold: float = 0.5,
+    n_bootstrap: int = 1000,
+    alpha: float = 0.05,
+    seed: int = 42,
+) -> Dict[str, Tuple[float, float]]:
+    """Compute bootstrap confidence intervals for key classification metrics.
+
+    Resamples ``(probs, labels)`` with replacement *n_bootstrap* times,
+    computes each metric on every resample, then reports the
+    ``[alpha/2, 1-alpha/2]`` percentiles as the CI.
+
+    Args:
+        probs:       1-D array of predicted probabilities.
+        labels:      1-D binary ground-truth labels (0 or 1).
+        threshold:   Decision threshold for converting probs to binary preds.
+        n_bootstrap: Number of bootstrap iterations (default 1000).
+        alpha:       Significance level; 0.05 gives 95% CIs.
+        seed:        Random seed for reproducibility.
+
+    Returns:
+        Dict mapping metric name → ``(lower_bound, upper_bound)``.
+        Metrics included: ``auc``, ``f1``, ``precision``, ``recall``,
+        ``accuracy``.
+
+    Example::
+
+        cis = bootstrap_confidence_intervals(probs, labels)
+        print(f"AUC: {auc:.4f}  95% CI [{cis['auc'][0]:.4f}, {cis['auc'][1]:.4f}]")
+    """
+    from sklearn.metrics import (
+        roc_auc_score, f1_score, precision_score, recall_score, accuracy_score,
+    )
+
+    rng = np.random.default_rng(seed)
+    n = len(labels)
+
+    metric_samples: Dict[str, List[float]] = {
+        "auc": [], "f1": [], "precision": [], "recall": [], "accuracy": [],
+    }
+
+    for _ in range(n_bootstrap):
+        idx = rng.integers(0, n, size=n)
+        b_probs  = probs[idx]
+        b_labels = labels[idx]
+        b_preds  = (b_probs >= threshold).astype(float)
+
+        # Skip resamples with only one class (AUC undefined)
+        if len(np.unique(b_labels)) < 2:
+            continue
+
+        metric_samples["auc"].append(roc_auc_score(b_labels, b_probs))
+        metric_samples["f1"].append(f1_score(b_labels, b_preds, zero_division=0))
+        metric_samples["precision"].append(precision_score(b_labels, b_preds, zero_division=0))
+        metric_samples["recall"].append(recall_score(b_labels, b_preds, zero_division=0))
+        metric_samples["accuracy"].append(accuracy_score(b_labels, b_preds))
+
+    lo_pct = 100.0 * (alpha / 2)
+    hi_pct = 100.0 * (1.0 - alpha / 2)
+
+    cis: Dict[str, Tuple[float, float]] = {}
+    for metric, samples in metric_samples.items():
+        if not samples:
+            cis[metric] = (float("nan"), float("nan"))
+        else:
+            arr = np.array(samples)
+            cis[metric] = (float(np.percentile(arr, lo_pct)), float(np.percentile(arr, hi_pct)))
+
+    return cis
+
+
 def compute_span_level_metrics(
     token_probs: np.ndarray,
     pos_spans: List[List[int]],

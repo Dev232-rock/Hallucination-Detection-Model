@@ -52,6 +52,15 @@ class SpanResult:
 
 
 @dataclass
+class SentenceResult:
+    """Aggregated hallucination score for one sentence in the completion."""
+    text: str             # sentence text
+    score: float          # max token hallucination probability within the sentence
+    mean_score: float     # mean token hallucination probability within the sentence
+    is_hallucinated: bool # True if score >= detector threshold
+
+
+@dataclass
 class DetectionResult:
     """Full detection output for one (prompt, completion) pair."""
     prompt: str
@@ -59,6 +68,7 @@ class DetectionResult:
     token_scores: List[float]       # per-token hallucination probability
     token_texts: List[str]          # decoded text for each token
     hallucinated_spans: List[SpanResult] = field(default_factory=list)
+    sentence_scores: List[SentenceResult] = field(default_factory=list)
     is_hallucinated: bool = False   # True if any span exceeds threshold
     max_score: float = 0.0
 
@@ -77,6 +87,15 @@ class DetectionResult:
                 }
                 for s in self.hallucinated_spans
             ],
+            "sentence_scores": [
+                {
+                    "text": s.text,
+                    "score": s.score,
+                    "mean_score": s.mean_score,
+                    "is_hallucinated": s.is_hallucinated,
+                }
+                for s in self.sentence_scores
+            ],
             "token_scores": self.token_scores,
         }
 
@@ -90,6 +109,11 @@ class DetectionResult:
                 lines.append(f"  [{span.score:.3f}] \"{span.text}\"")
         else:
             lines.append("No hallucinations detected.")
+        if self.sentence_scores:
+            lines.append("Sentence scores:")
+            for s in self.sentence_scores:
+                flag = " ⚠" if s.is_hallucinated else ""
+                lines.append(f"  [{s.score:.3f}]{flag} {s.text[:80].strip()!r}")
         return "\n".join(lines)
 
 
@@ -389,8 +413,109 @@ class HallucinationDetector:
         return spans
 
     # ------------------------------------------------------------------
-    # Threshold calibration
+    # Sentence-level aggregation
     # ------------------------------------------------------------------
+
+    def sentence_level_scores(
+        self,
+        result: DetectionResult,
+    ) -> List[SentenceResult]:
+        """Split the completion into sentences and score each one.
+
+        The score for a sentence is the **max** per-token hallucination
+        probability among all tokens that fall inside that sentence.  The mean
+        is also stored for softer ranking.
+
+        Sentence splitting uses ``nltk.sent_tokenize`` when available,
+        falling back to a simple regex split on punctuation boundaries.
+
+        Args:
+            result: A :class:`DetectionResult` returned by :meth:`detect`.
+
+        Returns:
+            List of :class:`SentenceResult`, one per sentence.  Also stores
+            the list in ``result.sentence_scores`` for convenience.
+        """
+        if not result.token_scores:
+            return []
+
+        probs  = np.array(result.token_scores)   # (n_completion_tokens,)
+        tokens = result.token_texts               # same length
+
+        # Reconstruct the completion text from decoded tokens
+        completion_text = "".join(tokens)
+
+        # Split into sentences
+        try:
+            import nltk
+            try:
+                sentences = nltk.sent_tokenize(completion_text)
+            except LookupError:
+                nltk.download("punkt", quiet=True)
+                nltk.download("punkt_tab", quiet=True)
+                sentences = nltk.sent_tokenize(completion_text)
+        except ImportError:
+            # Fallback: split on sentence-ending punctuation
+            import re
+            sentences = re.split(r'(?<=[.!?])\s+', completion_text.strip())
+            sentences = [s for s in sentences if s.strip()]
+
+        if not sentences:
+            return []
+
+        sentence_results: List[SentenceResult] = []
+        char_cursor = 0
+        token_cursor = 0
+
+        for sent_text in sentences:
+            # Find the start of this sentence in the completion text
+            sent_start_char = completion_text.find(sent_text, char_cursor)
+            if sent_start_char == -1:
+                # If not found (unlikely), skip
+                char_cursor += len(sent_text)
+                continue
+            sent_end_char = sent_start_char + len(sent_text)
+
+            # Map character range → token range by re-assembling tokens
+            sent_token_probs: List[float] = []
+            rebuilt = ""
+            for t_idx in range(token_cursor, len(tokens)):
+                rebuilt_next = rebuilt + tokens[t_idx]
+                tok_start_char = sum(len(tokens[k]) for k in range(token_cursor, t_idx))
+
+                # Check if this token overlaps with the sentence character range
+                tok_char_start = len("".join(tokens[token_cursor:t_idx]))
+                tok_char_end   = tok_char_start + len(tokens[t_idx])
+
+                # Map relative to char_cursor
+                abs_tok_start = char_cursor + tok_char_start
+                abs_tok_end   = char_cursor + tok_char_end
+
+                if abs_tok_start >= sent_end_char:
+                    break  # past the sentence
+                if abs_tok_end <= sent_start_char:
+                    token_cursor = t_idx + 1
+                    continue  # before the sentence
+
+                sent_token_probs.append(float(probs[t_idx]) if t_idx < len(probs) else 0.0)
+
+            char_cursor = sent_end_char
+
+            if not sent_token_probs:
+                sent_token_probs = [0.0]
+
+            max_score  = float(np.max(sent_token_probs))
+            mean_score = float(np.mean(sent_token_probs))
+
+            sentence_results.append(SentenceResult(
+                text=sent_text,
+                score=max_score,
+                mean_score=mean_score,
+                is_hallucinated=max_score >= self.threshold,
+            ))
+
+        result.sentence_scores = sentence_results
+        return sentence_results
 
     def calibrate(
         self,

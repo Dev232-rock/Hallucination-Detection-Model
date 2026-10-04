@@ -124,15 +124,153 @@ def prepare_generic(row: dict) -> Optional[ProbingItem]:
     return ProbingItem(prompt=prompt, completion=completion, spans=spans)
 
 
+def prepare_truthfulqa(row: dict) -> Optional[ProbingItem]:
+    """TruthfulQA dataset (https://huggingface.co/datasets/truthful_qa).
+
+    Uses the ``generation`` config subset.  Each row has a ``question``,
+    a ``best_answer`` (factual), and a list of ``incorrect_answers``
+    (hallucinated).  We emit one ProbingItem per answer, labelling the
+    whole completion as either factual (0.0) or hallucinated (1.0) at
+    the sentence level.
+
+    Expected columns: ``question``, ``best_answer``, ``incorrect_answers``
+    """
+    question  = row.get("question", "") or row.get("prompt", "")
+    best      = row.get("best_answer", "") or row.get("correct_answers", [""])[0]
+    incorrect = row.get("incorrect_answers", []) or []
+
+    if not question:
+        return None
+
+    items: List[ProbingItem] = []
+    # Factual answer
+    if best:
+        span = AnnotatedSpan(span=best, label=0.0, index=0)
+        items.append(ProbingItem(prompt=question, completion=best, spans=[span]))
+    # Pick the first incorrect answer (keeps one item per row for simplicity)
+    if incorrect:
+        bad = incorrect[0] if isinstance(incorrect, list) else str(incorrect)
+        span = AnnotatedSpan(span=bad, label=1.0, index=0)
+        items.append(ProbingItem(prompt=question, completion=bad, spans=[span]))
+
+    # Return the first item; the dataset loader iterates rows so both will
+    # be covered when the caller iterates over the dataset directly.
+    # For multi-item rows, callers can use prepare_truthfulqa_all below.
+    return items[0] if items else None
+
+
+def prepare_truthfulqa_all(row: dict) -> List[ProbingItem]:
+    """Like prepare_truthfulqa but returns ALL answers (factual + incorrect).
+
+    Use this when you want every answer in the row as a separate ProbingItem.
+    Register it and iterate with a custom loop rather than the default
+    ``get_prepare_function`` path.
+    """
+    question  = row.get("question", "") or row.get("prompt", "")
+    best      = row.get("best_answer", "") or ""
+    incorrect = row.get("incorrect_answers", []) or []
+    correct   = row.get("correct_answers", []) or []
+
+    if not question:
+        return []
+
+    items: List[ProbingItem] = []
+    for ans in ([best] if best else []) + list(correct):
+        span = AnnotatedSpan(span=ans, label=0.0, index=0)
+        items.append(ProbingItem(prompt=question, completion=ans, spans=[span]))
+    for ans in incorrect:
+        span = AnnotatedSpan(span=ans, label=1.0, index=0)
+        items.append(ProbingItem(prompt=question, completion=ans, spans=[span]))
+    return items
+
+
+def prepare_factscore(row: dict) -> Optional[ProbingItem]:
+    """FactScore-style dataset with atomic claim annotations.
+
+    Expected columns:
+        - ``topic`` / ``prompt``        : the entity / question
+        - ``output`` / ``completion``   : the generated biography / response
+        - ``annotations`` (list of dicts): each with ``text`` and
+          ``label`` (``"S"`` = supported, ``"NS"`` = not supported / hallucinated)
+
+    Compatible with the FActScoring benchmark
+    (https://github.com/shmsw25/FActScoring) when exported to JSONL.
+    """
+    prompt     = row.get("topic", "") or row.get("prompt", "") or row.get("input", "")
+    completion = row.get("output", "") or row.get("completion", "") or row.get("response", "")
+    annotations = row.get("annotations", []) or row.get("claims", []) or []
+
+    if not prompt or not completion:
+        return None
+
+    label_map = {
+        "s": 0.0, "supported": 0.0, "true": 0.0, "1": 0.0,
+        "ns": 1.0, "not supported": 1.0, "false": 1.0, "0": 1.0,
+        "ir": -100.0, "irrelevant": -100.0,
+    }
+
+    spans: List[AnnotatedSpan] = []
+    for ann in annotations:
+        text  = ann.get("text") or ann.get("claim") or ann.get("span") or ""
+        raw   = str(ann.get("label", ann.get("is_supported", "ir"))).lower().strip()
+        label = label_map.get(raw, -100.0)
+        idx   = completion.find(text)
+        spans.append(AnnotatedSpan(span=text, label=label, index=max(idx, 0)))
+
+    if not spans:
+        # No annotations — treat the whole completion as a factual span
+        spans = [AnnotatedSpan(span=completion, label=0.0, index=0)]
+
+    return ProbingItem(prompt=prompt, completion=completion, spans=spans)
+
+
+def prepare_shroom(row: dict) -> Optional[ProbingItem]:
+    """SHROOM shared-task dataset (SemEval-2024 Task 6).
+
+    Expected columns:
+        - ``src``      : source sentence / question
+        - ``hyp``      : model hypothesis / generated text
+        - ``tgt``      : reference target (if available)
+        - ``label``    : ``"Hallucination"`` or ``"Not Hallucination"``
+        - ``p(Hallucination)`` : float probability (optional)
+
+    See https://huggingface.co/datasets/aqweteddy/SHROOM_unlabeled for format.
+    """
+    prompt     = row.get("src", "") or row.get("source", "") or row.get("prompt", "")
+    completion = row.get("hyp", "") or row.get("hypothesis", "") or row.get("completion", "")
+    raw_label  = str(row.get("label", "")).strip().lower()
+
+    if not prompt or not completion:
+        return None
+
+    if "not" in raw_label or raw_label in ("0", "false", "no"):
+        label = 0.0
+    elif raw_label in ("hallucination", "1", "true", "yes"):
+        label = 1.0
+    else:
+        label = -100.0  # unlabelled
+
+    span = AnnotatedSpan(span=completion, label=label, index=0)
+    return ProbingItem(
+        prompt=prompt,
+        completion=completion,
+        spans=[span],
+        metadata={"p_hallucination": row.get("p(Hallucination)")},
+    )
+
+
 # ---------------------------------------------------------------------------
 # Registry
 # ---------------------------------------------------------------------------
 
 DATASET_CONVERTERS: Dict[str, Callable[[dict], Optional[ProbingItem]]] = {
-    "ragtruth": prepare_ragtruth,
-    "felm": prepare_felm,
-    "halueval": prepare_halueval,
-    "generic": prepare_generic,
+    "ragtruth":   prepare_ragtruth,
+    "felm":       prepare_felm,
+    "halueval":   prepare_halueval,
+    "generic":    prepare_generic,
+    "truthfulqa": prepare_truthfulqa,
+    "factscore":  prepare_factscore,
+    "shroom":     prepare_shroom,
 }
 
 

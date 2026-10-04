@@ -30,6 +30,7 @@ from transformers import AutoTokenizer, get_cosine_schedule_with_warmup
 from utils.files_utlis import load_yaml, save_json
 from utils.metrics import compute_clf_metrics, evaluate_predictions, plot_roc_curves, print_eval_metrics
 from utils.model_utils import get_device, load_model_and_tokenizer, print_trainable_parameters, setup_lora_for_layers
+from utils.probe_loader import upload_probe_to_hf
 
 from .config import TrainingConfig
 from .dataset import TokenizedProbingDataset
@@ -189,6 +190,14 @@ def train(config: TrainingConfig) -> None:
         probe_head=probe_head,
         layer_idx=config.probe_config.layer,
     ).to(device)
+
+    # ---- Gradient checkpointing ----
+    if config.enable_gradient_checkpointing:
+        try:
+            probed_model.model.gradient_checkpointing_enable()
+            print("Gradient checkpointing enabled.")
+        except AttributeError:
+            print("Warning: gradient_checkpointing_enable() not supported for this model.")
 
     print_trainable_parameters(probed_model)
 
@@ -353,6 +362,20 @@ def train(config: TrainingConfig) -> None:
 
     if use_wandb:
         wandb.finish()
+
+    # ---- Optional HuggingFace Hub upload ----
+    if config.upload_to_hf:
+        hf_repo = getattr(config, "hf_repo_id", config.probe_config.hf_repo_id)
+        if hf_repo:
+            print(f"Uploading probe to HuggingFace Hub: {hf_repo} ...")
+            url = upload_probe_to_hf(
+                repo_id=hf_repo,
+                probe_id=config.probe_config.probe_id,
+                local_folder=save_dir,
+            )
+            print(f"✓ Uploaded to {url}")
+        else:
+            print("Warning: upload_to_hf=True but no hf_repo_id configured — skipping upload.")
 
     print(f"\n✓ Training complete. Model saved to {save_dir}")
 
