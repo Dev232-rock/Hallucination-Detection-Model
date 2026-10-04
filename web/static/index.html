@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Hallucination Detection Studio — LLM Representation Probing</title>
+  <meta name="description" content="State-of-the-art token, span, and sentence-level hallucination detection for Large Language Models using hidden representation probing.">
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+  <!-- Top App Navigation -->
+  <header class="app-header">
+    <div class="header-container">
+      <div class="brand-wrapper">
+        <div class="logo-icon">
+          <svg viewBox="0 0 24 24">
+            <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm1 17.93c-3.95-.49-7-3.85-7-7.93 0-.62.08-1.21.21-1.79L9 15v1c0 1.1.9 2 2 2v1.93zm6.9-2.54c-.26-.81-1-1.39-1.9-1.39h-1v-3c0-.55-.45-1-1-1H8v-2h2c.55 0 1-.45 1-1V7h2c1.1 0 2-.9 2-2v-.41c2.93 1.19 5 4.06 5 7.41 0 2.08-.8 3.97-2.1 5.39z"/>
+          </svg>
+        </div>
+        <div class="brand-titles">
+          <h1>Hallucination Detection Studio</h1>
+          <div class="brand-subtitle">Transformer Representation Probing Engine</div>
+        </div>
+      </div>
+
+      <div class="header-status-group">
+        <div class="status-pill" id="engineStatusPill">
+          <span class="pulse-dot"></span>
+          <span id="engineStatusText">Probe Engine: Ready</span>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <!-- Main Content Layout -->
+  <main class="main-wrapper">
+    <!-- Left Column: Input Panel -->
+    <section class="glass-panel" aria-labelledby="inputPanelTitle">
+      <div class="panel-header">
+        <h2 id="inputPanelTitle" class="panel-title">
+          <span>⚙️</span> Detection Parameters
+        </h2>
+      </div>
+
+      <!-- Presets Selector -->
+      <div class="presets-section">
+        <label class="section-label">Quick Scenario Presets</label>
+        <div class="preset-chips-container" id="presetChipsContainer">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <!-- Prompt Input -->
+      <div class="input-group">
+        <div class="input-label-row">
+          <label for="promptInput" class="input-label">Prompt Context</label>
+          <span class="char-counter" id="promptCharCount">0 chars</span>
+        </div>
+        <textarea id="promptInput" class="styled-textarea" placeholder="Enter prompt or query context..." rows="3"></textarea>
+      </div>
+
+      <!-- Completion Input -->
+      <div class="input-group">
+        <div class="input-label-row">
+          <label for="completionInput" class="input-label">LLM Completion to Audit</label>
+          <span class="char-counter" id="completionCharCount">0 chars</span>
+        </div>
+        <textarea id="completionInput" class="styled-textarea" placeholder="Enter generated text to detect hallucinations..." rows="5"></textarea>
+      </div>
+
+      <!-- Live Threshold Slider -->
+      <div class="controls-card">
+        <div class="slider-header">
+          <label for="thresholdRange" class="input-label">Decision Threshold</label>
+          <span class="threshold-badge" id="thresholdValueBadge">0.50</span>
+        </div>
+        <input type="range" id="thresholdRange" class="styled-range" min="0.05" max="0.95" step="0.01" value="0.50">
+        <div style="display:flex; justify-content:space-between; font-size:0.72rem; color:var(--text-faint); margin-top:0.3rem;">
+          <span>Sensitive (0.05)</span>
+          <span>Calibrated (0.50)</span>
+          <span>Conservative (0.95)</span>
+        </div>
+      </div>
+
+      <!-- Analyze Button -->
+      <button id="analyzeButton" class="btn-analyze">
+        <span class="btn-spinner" id="analyzeSpinner"></span>
+        <span id="analyzeBtnText">Audit for Hallucinations</span>
+      </button>
+    </section>
+
+    <!-- Right Column: Results & Probing Analytics -->
+    <section class="glass-panel" aria-labelledby="analyticsTitle">
+      <div class="panel-header">
+        <h2 id="analyticsTitle" class="panel-title">
+          <span>🔍</span> Probing Diagnostics
+        </h2>
+        <div id="verdictBadge" class="status-pill" style="display: none;">
+          <!-- Populated by JS -->
+        </div>
+      </div>
+
+      <div class="results-container">
+        <!-- Metrics Ribbon -->
+        <div class="metrics-grid">
+          <div class="metric-card" id="cardMaxRisk">
+            <span class="metric-title">Max Token Risk</span>
+            <span class="metric-value" id="valMaxRisk">—</span>
+          </div>
+          <div class="metric-card" id="cardSequenceRisk">
+            <span class="metric-title">Mean Risk Score</span>
+            <span class="metric-value" id="valMeanRisk">—</span>
+          </div>
+          <div class="metric-card" id="cardSpansCount">
+            <span class="metric-title">Flagged Spans</span>
+            <span class="metric-value" id="valSpansCount">—</span>
+          </div>
+          <div class="metric-card" id="cardSentencesCount">
+            <span class="metric-title">Sentence Halluc.</span>
+            <span class="metric-value" id="valSentenceRatio">—</span>
+          </div>
+        </div>
+
+        <!-- Tabs Navigation -->
+        <nav class="tabs-nav" aria-label="Views">
+          <button id="tabHeatmapBtn" class="tab-btn active" data-tab="heatmapView">Token Heatmap</button>
+          <button id="tabSentencesBtn" class="tab-btn" data-tab="sentencesView">Sentence Breakdown</button>
+          <button id="tabSpansBtn" class="tab-btn" data-tab="spansView">Hallucinated Spans</button>
+          <button id="tabJsonBtn" class="tab-btn" data-tab="jsonView">Raw JSON Export</button>
+        </nav>
+
+        <!-- Tab 1: Heatmap View -->
+        <div id="heatmapView" class="tab-content">
+          <div style="font-size:0.8rem; color:var(--text-muted); margin-bottom:0.75rem;">
+            Hover any token to view probe probability. Glowing tokens exceed the decision threshold.
+          </div>
+          <div id="tokenHeatmapContainer" class="heatmap-container">
+            <div style="color:var(--text-faint); text-align:center; padding:3rem 0;">
+              Run analysis to visualize token-level probe heatmaps.
+            </div>
+          </div>
+        </div>
+
+        <!-- Tab 2: Sentences View -->
+        <div id="sentencesView" class="tab-content" style="display: none;">
+          <div class="sentence-list" id="sentenceListContainer">
+            <!-- Populated by JS -->
+          </div>
+        </div>
+
+        <!-- Tab 3: Spans View -->
+        <div id="spansView" class="tab-content" style="display: none;">
+          <div class="spans-table-container">
+            <table class="spans-table">
+              <thead>
+                <tr>
+                  <th>Span Text</th>
+                  <th>Tokens</th>
+                  <th>Mean Risk</th>
+                  <th>Verdict</th>
+                </tr>
+              </thead>
+              <tbody id="spansTableBody">
+                <tr>
+                  <td colspan="4" style="text-align:center; color:var(--text-faint); padding:2rem;">
+                    No spans flagged yet.
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+          </div>
+        </div>
+
+        <!-- Tab 4: JSON View -->
+        <div id="jsonView" class="tab-content" style="display: none;">
+          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:0.6rem;">
+            <span style="font-size:0.8rem; color:var(--text-muted);">Full Structured API Payload</span>
+            <button id="copyJsonBtn" class="copy-btn">Copy JSON</button>
+          </div>
+          <pre id="jsonExportContent" class="code-export-box">// Probing output will appear here...</pre>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <script src="/static/app.js"></script>
+</body>
+</html>

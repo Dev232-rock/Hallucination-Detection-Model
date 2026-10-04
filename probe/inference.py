@@ -614,40 +614,179 @@ class HallucinationDetector:
             text = text.replace(span.text.strip(), f"[[{span.text.strip()}]]", 1)
         return text
 
+    def detect_file(
+        self,
+        input_file: Union[str, Path],
+        output_file: Union[str, Path],
+        batch_size: int = 16,
+        include_sentences: bool = True,
+    ) -> int:
+        """Run batch hallucination detection over a JSONL file.
+
+        Each input JSONL line must contain at least "prompt" and "completion".
+        All other fields from the input are preserved, and detection fields are added:
+            - is_hallucinated (bool)
+            - hallucination_score (float)
+            - hallucinated_spans (list of dicts)
+            - highlighted_completion (str)
+            - sentences (list of dicts, if include_sentences is True)
+
+        Args:
+            input_file: Path to input .jsonl file.
+            output_file: Path to output .jsonl file.
+            batch_size: Number of pairs per forward pass.
+            include_sentences: Whether to compute sentence-level scores.
+
+        Returns:
+            Total number of samples processed.
+        """
+        from tqdm import tqdm
+
+        input_path = Path(input_file)
+        output_path = Path(output_file)
+        output_path.parent.mkdir(parents=True, exist_ok=True)
+
+        records: List[dict] = []
+        with open(input_path, "r", encoding="utf-8") as f:
+            for line_no, line in enumerate(f, start=1):
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    data = json.loads(line)
+                    if "prompt" not in data or "completion" not in data:
+                        raise ValueError(f"Line {line_no} missing 'prompt' or 'completion'")
+                    records.append(data)
+                except Exception as e:
+                    print(f"Warning: skipping line {line_no}: {e}")
+
+        total_samples = len(records)
+        print(f"Loaded {total_samples} samples from {input_path}")
+        if total_samples == 0:
+            return 0
+
+        start_time = time.time()
+        processed_count = 0
+
+        with open(output_path, "w", encoding="utf-8") as out_f:
+            for i in tqdm(range(0, total_samples, batch_size), desc="Scoring JSONL batches"):
+                chunk = records[i : i + batch_size]
+                pairs = [(r["prompt"], r["completion"]) for r in chunk]
+
+                results = self.detect_batch(pairs)
+
+                for orig_record, res in zip(chunk, results):
+                    out_record = dict(orig_record)
+                    out_record["is_hallucinated"] = res.is_hallucinated
+                    out_record["hallucination_score"] = float(res.hallucination_score)
+                    out_record["hallucinated_spans"] = [
+                        {
+                            "text": s.text,
+                            "start_token": s.start_token,
+                            "end_token": s.end_token,
+                            "score": float(s.score),
+                        }
+                        for s in res.hallucinated_spans
+                    ]
+                    out_record["highlighted_completion"] = self.highlight(res)
+
+                    if include_sentences:
+                        sent_results = self.sentence_level_scores(res)
+                        out_record["sentences"] = [
+                            {
+                                "text": s.text,
+                                "score": float(s.score),
+                                "mean_score": float(s.mean_score),
+                                "is_hallucinated": s.is_hallucinated,
+                            }
+                            for s in sent_results
+                        ]
+
+                    out_f.write(json.dumps(out_record, ensure_ascii=False) + "\n")
+                    processed_count += 1
+
+        elapsed = time.time() - start_time
+        throughput = processed_count / max(elapsed, 1e-4)
+        print(f"Finished {processed_count} samples in {elapsed:.2f}s ({throughput:.1f} samples/s)")
+        print(f"Saved results to: {output_path}")
+        return processed_count
+
 
 # ---------------------------------------------------------------------------
 # CLI
 # ---------------------------------------------------------------------------
 
 def parse_args() -> argparse.Namespace:
-    parser = argparse.ArgumentParser(description="Detect hallucinations in text")
-    parser.add_argument("--probe_id",   type=str, required=True)
-    parser.add_argument("--prompt",     type=str, required=True)
-    parser.add_argument("--completion", type=str, required=True)
-    parser.add_argument("--threshold",  type=float, default=0.5)
-    parser.add_argument("--load_from",  type=str, default="disk", choices=["disk", "hf"])
-    parser.add_argument("--hf_repo_id", type=str, default="andyrdt/hallucination-probes")
-    parser.add_argument("--json",       action="store_true", help="Output JSON instead of human-readable")
+    parser = argparse.ArgumentParser(description="Detect hallucinations in text or JSONL datasets")
+    parser.add_argument("--probe_id",          type=str, required=True, help="Probe directory name or HF identifier")
+    parser.add_argument("--prompt",            type=str, default=None, help="Input prompt text")
+    parser.add_argument("--completion",        type=str, default=None, help="Input completion text")
+    parser.add_argument("--input_file",        type=str, default=None, help="Path to input .jsonl file for batch scoring")
+    parser.add_argument("--output_file",       type=str, default=None, help="Path to output .jsonl file")
+    parser.add_argument("--batch_size",        type=int, default=16, help="Batch size for batch processing")
+    parser.add_argument("--threshold",         type=float, default=0.5, help="Hallucination decision threshold")
+    parser.add_argument("--device",            type=str, default="auto", choices=["auto", "cuda", "cpu", "mps"])
+    parser.add_argument("--load_from",         type=str, default="disk", choices=["disk", "hf"])
+    parser.add_argument("--hf_repo_id",        type=str, default="andyrdt/hallucination-probes")
+    parser.add_argument("--json",              action="store_true", help="Output JSON instead of human-readable (single mode)")
+    parser.add_argument("--include_sentences", action="store_true", help="Include sentence-level scores in output")
     return parser.parse_args()
 
 
-if __name__ == "__main__":
+def main():
     args = parse_args()
 
     detector = HallucinationDetector.from_pretrained(
         probe_id=args.probe_id,
         load_from=args.load_from,
         hf_repo_id=args.hf_repo_id,
+        device=args.device,
         threshold=args.threshold,
     )
 
-    result = detector.detect(prompt=args.prompt, completion=args.completion)
+    if args.input_file:
+        if not args.output_file:
+            in_p = Path(args.input_file)
+            args.output_file = str(in_p.with_name(f"{in_p.stem}_detected{in_p.suffix}"))
+        detector.detect_file(
+            input_file=args.input_file,
+            output_file=args.output_file,
+            batch_size=args.batch_size,
+            include_sentences=args.include_sentences,
+        )
+    elif args.prompt is not None and args.completion is not None:
+        result = detector.detect(prompt=args.prompt, completion=args.completion)
 
-    if args.json:
-        print(json.dumps(result.to_dict(), indent=2))
+        if args.json:
+            out_data = result.to_dict()
+            if args.include_sentences:
+                sent_results = detector.sentence_level_scores(result)
+                out_data["sentences"] = [
+                    {
+                        "text": s.text,
+                        "score": float(s.score),
+                        "mean_score": float(s.mean_score),
+                        "is_hallucinated": s.is_hallucinated,
+                    }
+                    for s in sent_results
+                ]
+            print(json.dumps(out_data, indent=2))
+        else:
+            print("\n" + "=" * 60)
+            print(result)
+            if args.include_sentences:
+                print("\nSentence-level Breakdown:")
+                sent_results = detector.sentence_level_scores(result)
+                for i, s in enumerate(sent_results, 1):
+                    tag = "🚨 [HALLUCINATION]" if s.is_hallucinated else "✅ [FACTUAL]"
+                    print(f"  {i}. {tag} (max={s.score:.3f}, mean={s.mean_score:.3f}): {s.text}")
+            print("\nHighlighted completion:")
+            print(detector.highlight(result))
+            print("=" * 60)
     else:
-        print("\n" + "=" * 60)
-        print(result)
-        print("\nHighlighted completion:")
-        print(detector.highlight(result))
-        print("=" * 60)
+        print("Error: Must provide either (--prompt AND --completion) or --input_file")
+        exit(1)
+
+
+if __name__ == "__main__":
+    main()

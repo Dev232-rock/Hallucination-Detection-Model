@@ -180,7 +180,9 @@ def compute_span_level_metrics(
     neg_spans: List[List[int]],
     threshold: float = 0.5,
     aggregation: str = "max",
-) -> Dict[str, float]:
+    compute_ci: bool = False,
+    n_bootstrap: int = 1000,
+) -> Dict[str, any]:
     """Compute span-level hallucination detection metrics.
 
     For each span (positive = hallucinated, negative = factual) we aggregate
@@ -196,6 +198,8 @@ def compute_span_level_metrics(
         threshold:    Decision threshold applied to span scores.
         aggregation:  How to pool token probs within a span — ``"max"`` or
                       ``"mean"``.
+        compute_ci:   Whether to compute bootstrap confidence intervals.
+        n_bootstrap:  Number of bootstrap iterations for CI calculation.
 
     Returns:
         Dict with the same keys as :func:`compute_clf_metrics`, prefixed with
@@ -239,7 +243,12 @@ def compute_span_level_metrics(
     if len(np.unique(labels_arr)) < 2:
         return {}
 
-    return compute_clf_metrics(preds=preds_arr, labels=labels_arr, probs=probs_arr)
+    metrics = compute_clf_metrics(preds=preds_arr, labels=labels_arr, probs=probs_arr)
+    if compute_ci:
+        metrics["ci"] = bootstrap_confidence_intervals(
+            probs=probs_arr, labels=labels_arr, threshold=threshold, n_bootstrap=n_bootstrap
+        )
+    return metrics
 
 
 def evaluate_predictions(
@@ -248,7 +257,9 @@ def evaluate_predictions(
     pos_spans: List[List[int]],
     neg_spans: List[List[int]],
     threshold: float = 0.5,
-) -> Dict[str, Dict[str, float]]:
+    compute_ci: bool = False,
+    n_bootstrap: int = 1000,
+) -> Dict[str, Dict[str, any]]:
     """Return token-level **and** span-level (mean & max) metrics in one call.
 
     Returns a dict with three keys: ``"token"``, ``"span_mean"``,
@@ -256,16 +267,21 @@ def evaluate_predictions(
     :func:`compute_clf_metrics` / :func:`compute_span_level_metrics`.
     """
     valid_mask = token_labels != -100.0
-    results: Dict[str, Dict[str, float]] = {}
+    results: Dict[str, Dict[str, any]] = {}
 
     if valid_mask.any():
         valid_probs = token_probs[valid_mask]
         valid_labels = token_labels[valid_mask]
         valid_preds = (valid_probs >= threshold).astype(float)
         if len(np.unique(valid_labels)) >= 2:
-            results["token"] = compute_clf_metrics(
+            token_metrics = compute_clf_metrics(
                 preds=valid_preds, labels=valid_labels, probs=valid_probs
             )
+            if compute_ci:
+                token_metrics["ci"] = bootstrap_confidence_intervals(
+                    probs=valid_probs, labels=valid_labels, threshold=threshold, n_bootstrap=n_bootstrap
+                )
+            results["token"] = token_metrics
 
     for agg in ("max", "mean"):
         span_metrics = compute_span_level_metrics(
@@ -274,6 +290,8 @@ def evaluate_predictions(
             neg_spans=neg_spans,
             threshold=threshold,
             aggregation=agg,
+            compute_ci=compute_ci,
+            n_bootstrap=n_bootstrap,
         )
         if span_metrics:
             results[f"span_{agg}"] = span_metrics
@@ -403,11 +421,17 @@ def print_eval_metrics(
     # Support both flat dicts (legacy) and nested dicts from evaluate_predictions
     def _print_level(level_name: str, m: dict) -> None:
         print(f"\n  [{level_name}]")
+        ci_dict = m.get("ci", {})
         for key in ("accuracy", "precision", "recall", "f1", "auc",
                     "recall_at_0.1_fpr", "recall_at_0.6_fpr",
                     "threshold_optimized_accuracy", "optimal_threshold"):
             if key in m:
-                print(f"    - {key:<35s}: {m[key]:.4f}")
+                ci_str = ""
+                if isinstance(ci_dict, dict) and key in ci_dict:
+                    lo, hi = ci_dict[key]
+                    if not (np.isnan(lo) or np.isnan(hi)):
+                        ci_str = f"  (95% CI: [{lo:.4f}, {hi:.4f}])"
+                print(f"    - {key:<30s}: {m[key]:.4f}{ci_str}")
         counts = {k: m[k] for k in ("total_samples", "true_positive_count",
                                      "true_negative_count") if k in m}
         if counts:

@@ -1,0 +1,69 @@
+[build-system]
+requires = ["setuptools>=61.0", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "hallucination-detector"
+version = "0.2.0"
+description = "Token-level, span-level, and sentence-level hallucination detection for LLMs using representation probing."
+readme = "README.md"
+requires-python = ">=3.9"
+license = { text = "MIT" }
+authors = [
+    { name = "Dev" }
+]
+keywords = [
+    "hallucination-detection",
+    "large-language-models",
+    "probing",
+    "mechanistic-interpretability",
+    "nlp",
+    "safety"
+]
+classifiers = [
+    "Programming Language :: Python :: 3",
+    "Programming Language :: Python :: 3.9",
+    "Programming Language :: Python :: 3.10",
+    "Programming Language :: Python :: 3.11",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+]
+dependencies = [
+    "torch>=2.0.0",
+    "transformers>=4.35.0",
+    "datasets>=2.14.0",
+    "accelerate>=0.24.0",
+    "peft>=0.6.0",
+    "scikit-learn>=1.2.0",
+    "numpy>=1.24.0",
+    "matplotlib>=3.7.0",
+    "pyyaml>=6.0",
+    "tqdm>=4.65.0",
+    "huggingface-hub>=0.19.0",
+    "nltk>=3.8.0",
+    "fastapi>=0.100.0",
+    "uvicorn>=0.22.0",
+    "pydantic>=2.0.0",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0.0",
+    "pytest-cov>=4.0.0",
+    "black>=23.0.0",
+    "ruff>=0.1.0",
+]
+ui = [
+    "fastapi>=0.100.0",
+    "uvicorn>=0.22.0",
+    "jinja2>=3.1.0",
+]
+
+[project.scripts]
+hallucination-detect = "probe.inference:main"
+hallucination-train  = "probe.train:main"
+hallucination-eval   = "probe.evaluate:main"
+hallucination-ui     = "web.app:main"
+
+[tool.setuptools.packages.find]
+include = ["probe*", "utils*", "web*"]
+exclude = ["configs*", "tests*"]
