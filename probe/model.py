@@ -25,7 +25,12 @@ from typing import Any, Dict, List, Optional, Tuple, Union
 import torch
 import torch.nn as nn
 import torch.nn.functional as F
-from peft import PeftModel
+try:
+    from peft import PeftModel
+    HAS_PEFT = True
+except ImportError:
+    PeftModel = type("PeftModel", (), {})
+    HAS_PEFT = False
 from transformers import PreTrainedModel
 
 from utils.model_utils import (
