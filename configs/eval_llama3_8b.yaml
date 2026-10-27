@@ -1,8 +1,7 @@
-"""Sample evaluation configuration.
-
-Run with:
-    python -m probe.evaluate --config configs/eval_llama3_8b.yaml
-"""
+# Sample evaluation configuration.
+#
+# Run with:
+#     python -m probe.evaluate --config configs/eval_llama3_8b.yaml
 
 probe_config:
   probe_id: "llama3_1_8b_lora_lambda_kl=0.5"
