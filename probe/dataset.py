@@ -111,6 +111,8 @@ class TokenizedProbingDataset(Dataset):
         lm_labels = input_ids.clone()
         lm_labels[:completion_start_idx] = -100  # ignore all tokens in the prompt
         lm_labels[attention_mask == 0] = -100  # ignore padding tokens
+        labels[attention_mask == 0] = -100.0  # ignore padding tokens
+        weights[attention_mask == 0] = 0.0
 
         return {
             "input_ids": input_ids,  # Int[Tensor, "seq_len"]
@@ -231,8 +233,8 @@ class TokenizedProbingDataset(Dataset):
                 continue
             
             if span.label == 0.0:  # factual
-                # Check if span is in prompt
-                if all(idx < completion_start_idx for idx in span_indices):
+                # Check if span is in assistant response
+                if all(idx >= completion_start_idx for idx in span_indices):
                     if self.config.last_span_token:
                         labeled = [span_indices[-1]]
                     else:
@@ -255,9 +257,11 @@ class TokenizedProbingDataset(Dataset):
                 spans=spans
             )
         
-        # Ensure labels and weights have same length as input_ids
-        labels = torch.zeros(len(input_ids))
-        weights = torch.zeros(len(input_ids))
+        # Initialize labels based on default_ignore setting
+        init_label = -100.0 if self.config.default_ignore else 0.0
+        init_weight = 0.0 if self.config.default_ignore else self.config.neg_weight
+        labels = torch.full((len(input_ids),), init_label)
+        weights = torch.full((len(input_ids),), init_weight)
         
         for idx in positive_indices:
             labels[idx] = 1.0
@@ -270,6 +274,10 @@ class TokenizedProbingDataset(Dataset):
         for idx in ignore_indices:
             labels[idx] = -100.0
             weights[idx] = 0.0
+
+        # Ignore all prompt tokens before assistant completion starts
+        labels[:completion_start_idx] = -100.0
+        weights[:completion_start_idx] = 0.0
         
         return labels, weights, positive_spans, negative_spans
     def _shuffle_items(self):
@@ -413,6 +421,8 @@ class StreamingProbingDataset(IterableDataset):
         lm_labels = input_ids.clone()
         lm_labels[:completion_start]       = -100
         lm_labels[attention_mask == 0]     = -100
+        labels[attention_mask == 0]        = -100.0
+        weights[attention_mask == 0]       = 0.0
 
         return {
             "input_ids":               input_ids,
